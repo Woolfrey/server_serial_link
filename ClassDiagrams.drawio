@@ -1,4 +1,4 @@
-<mxfile host="app.diagrams.net" modified="2024-04-12T03:06:22.670Z" agent="Mozilla/5.0 (X11; Linux x86_64; rv:124.0) Gecko/20100101 Firefox/124.0" etag="3m2gQwcZ0n6o_EpiD6lV" version="24.2.3" type="github">
+<mxfile host="app.diagrams.net" modified="2024-04-12T03:20:23.726Z" agent="Mozilla/5.0 (X11; Linux x86_64; rv:124.0) Gecko/20100101 Firefox/124.0" etag="mOYkA7_LQ5-2C9YCyYYZ" version="24.2.3" type="github">
   <diagram name="Page-1" id="4o6CYYe0LKN0wAGEkGuZ">
     <mxGraphModel dx="945" dy="698" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
@@ -250,6 +250,9 @@
         <mxCell id="vgtWHDoNtak8QW6DDmXx-20" value="Start" style="rounded=1;whiteSpace=wrap;html=1;arcSize=50;" vertex="1" parent="1">
           <mxGeometry x="294" y="560" width="120" height="50" as="geometry" />
         </mxCell>
+        <mxCell id="vgtWHDoNtak8QW6DDmXx-31" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="vgtWHDoNtak8QW6DDmXx-22" target="vgtWHDoNtak8QW6DDmXx-30">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
         <mxCell id="vgtWHDoNtak8QW6DDmXx-22" value="&lt;div&gt;Inputs&lt;/div&gt;&lt;div&gt;sound?&lt;br&gt;&lt;/div&gt;" style="rhombus;whiteSpace=wrap;html=1;" vertex="1" parent="1">
           <mxGeometry x="314" y="640" width="80" height="80" as="geometry" />
         </mxCell>
@@ -262,8 +265,52 @@
         <mxCell id="vgtWHDoNtak8QW6DDmXx-24" value="End" style="rounded=1;whiteSpace=wrap;html=1;arcSize=50;" vertex="1" parent="1">
           <mxGeometry x="294" y="940" width="120" height="50" as="geometry" />
         </mxCell>
+        <mxCell id="vgtWHDoNtak8QW6DDmXx-32" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="vgtWHDoNtak8QW6DDmXx-30" target="vgtWHDoNtak8QW6DDmXx-23">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
         <mxCell id="vgtWHDoNtak8QW6DDmXx-30" value="&lt;i&gt;read_joint_values()&lt;/i&gt;" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
           <mxGeometry x="294" y="750" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="vgtWHDoNtak8QW6DDmXx-40" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="vgtWHDoNtak8QW6DDmXx-36" target="vgtWHDoNtak8QW6DDmXx-37">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="vgtWHDoNtak8QW6DDmXx-36" value="Start" style="rounded=1;whiteSpace=wrap;html=1;arcSize=50;" vertex="1" parent="1">
+          <mxGeometry x="540" y="560" width="120" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="vgtWHDoNtak8QW6DDmXx-41" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="vgtWHDoNtak8QW6DDmXx-37" target="vgtWHDoNtak8QW6DDmXx-38">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="vgtWHDoNtak8QW6DDmXx-37" value="&lt;div&gt;Query joint&lt;/div&gt;&lt;div&gt;trajectory&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="540" y="660" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="vgtWHDoNtak8QW6DDmXx-42" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="vgtWHDoNtak8QW6DDmXx-38" target="vgtWHDoNtak8QW6DDmXx-39">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="vgtWHDoNtak8QW6DDmXx-38" value="Solve feedback control" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="540" y="760" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="vgtWHDoNtak8QW6DDmXx-45" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="vgtWHDoNtak8QW6DDmXx-39" target="vgtWHDoNtak8QW6DDmXx-43">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="vgtWHDoNtak8QW6DDmXx-39" value="read_joint_values()" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="540" y="860" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="vgtWHDoNtak8QW6DDmXx-46" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="vgtWHDoNtak8QW6DDmXx-43" target="vgtWHDoNtak8QW6DDmXx-44">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="vgtWHDoNtak8QW6DDmXx-48" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="vgtWHDoNtak8QW6DDmXx-43" target="vgtWHDoNtak8QW6DDmXx-37">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="720" y="990" />
+              <mxPoint x="720" y="690" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="vgtWHDoNtak8QW6DDmXx-43" value="Complete?" style="rhombus;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="560" y="950" width="80" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="vgtWHDoNtak8QW6DDmXx-44" value="End" style="rounded=1;whiteSpace=wrap;html=1;arcSize=50;" vertex="1" parent="1">
+          <mxGeometry x="540" y="1060" width="120" height="50" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
