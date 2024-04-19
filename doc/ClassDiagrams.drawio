@@ -1,4 +1,4 @@
-<mxfile host="app.diagrams.net" modified="2024-04-19T16:23:42.909Z" agent="Mozilla/5.0 (X11; Linux x86_64; rv:124.0) Gecko/20100101 Firefox/124.0" etag="wmkqVQ3GSqn1D27BV2iU" version="24.2.5" type="github" pages="3">
+<mxfile host="app.diagrams.net" modified="2024-04-19T16:43:40.041Z" agent="Mozilla/5.0 (X11; Linux x86_64; rv:124.0) Gecko/20100101 Firefox/124.0" etag="LEonp1FLtz3v_ZHHYdhP" version="24.2.5" type="github" pages="3">
   <diagram name="interactions" id="4o6CYYe0LKN0wAGEkGuZ">
     <mxGraphModel dx="945" dy="698" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
@@ -163,8 +163,8 @@
         <mxCell id="7X51sfq5ziitmy5_7VZK-5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;curved=1;dashed=1;" edge="1" parent="1" source="vpbeKz68ivnJ3yfsuHuT-35" target="7X51sfq5ziitmy5_7VZK-3">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
-              <mxPoint x="320" y="213" />
-              <mxPoint x="320" y="540" />
+              <mxPoint x="350" y="213" />
+              <mxPoint x="350" y="540" />
             </Array>
           </mxGeometry>
         </mxCell>
@@ -267,6 +267,12 @@
         </mxCell>
         <mxCell id="7X51sfq5ziitmy5_7VZK-3" value="Abstraction???" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;" vertex="1" parent="1">
           <mxGeometry x="450" y="500" width="120" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="7X51sfq5ziitmy5_7VZK-12" value="&lt;div&gt;template &amp;lt;class DataType&amp;gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;SerialPositionControl&lt;/b&gt;&lt;/div&gt;" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="30" y="570" width="150" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="7X51sfq5ziitmy5_7VZK-13" value="&lt;div&gt;template &amp;lt;class DataType&amp;gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;SerialForceControl&lt;/b&gt;&lt;/div&gt;" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="30" y="630" width="150" height="30" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
