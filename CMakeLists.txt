@@ -11,6 +11,7 @@ endif()
 find_package(ament_cmake REQUIRED)                                                                  # I don't know what this does ¯\_(ツ)_/¯ 
 find_package(rclcpp REQUIRED)                                                                       # ROS2 C++ libraries
 find_package(rclcpp_action REQUIRED)                                                                # ROS2 C++ Action libraries
+find_package(RobotLibrary REQUIRED)
 find_package(serial_link_interfaces REQUIRED)                                                       # Previously built ROS2 package
 
 include_directories(include)
