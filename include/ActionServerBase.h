@@ -10,8 +10,7 @@ using MoveToJointPositions = serial_link_interfaces::action::MoveToJointPosition
 using JointPositionsManager = rclcpp_action::ServerGoalHandle<MoveToJointPositions>;
 
 
-
-template <typename ControlType>
+template <class ControlType>
 class ActionServerBase : public rclcpp::Node
 {
      public:
@@ -26,10 +25,10 @@ class ActionServerBase : public rclcpp::Node
                using namespace std::placeholders;
                
                // Create & advertise the action for moving to multiple joint positions
-               this->_jointPositionsServer
-               = rclcpp_action::create_server<MoveToJointPositions>(this,
-                                                                    "move_to_joint_positions",
-                                                                    std::bind(&ActionServerBase::move_to_joint_positions)
+              // this->_jointPositionsServer
+              // = rclcpp_action::create_server<MoveToJointPositions>(this,
+               //                                                     "move_to_joint_positions",
+               //                                                     std::bind(&ActionServerBase::move_to_joint_positions))
           }
           
      private:
@@ -68,9 +67,9 @@ class ActionServerBase : public rclcpp::Node
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //              Request that the robot move through multiple joint positions.                     //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-rclcpp_action::GoalResponse
-ActionServerBase::move_to_joint_positions(const rclcpp_action::GoalUUID &uuid,
-                                          std::shared_ptr<const MoveToJointPositions::Goal> &request)
+//template <class ControlType>
+rclcpp_action::GoalResponse move_to_joint_positions(const rclcpp_action::GoalUUID &uuid,
+                                                       std::shared_ptr<const MoveToJointPositions::Goal> &request)
 {
      (void)uuid;                                                                                    // This stops colcon from throwing a warning
      (void)request;
@@ -85,7 +84,7 @@ ActionServerBase::move_to_joint_positions(const rclcpp_action::GoalUUID &uuid,
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                   Solve the feedback control to track a joint trajectory                       //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-void ActionServerBase::track_joint_trajectory(const std::shared_ptr<JointPositionsManager> requestManager)
+void track_joint_trajectory(const std::shared_ptr<JointPositionsManager> requestManager)
 {
      (void)requestManager;
      
