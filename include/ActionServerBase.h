@@ -1,6 +1,7 @@
 #include <rclcpp/rclcpp.hpp>                                                                        // ROS2 C++ libraries
 #include <rclcpp_action/rclcpp_action.hpp>                                                          // ROS2 action libaries
 #include <serial_link_interfaces/action/move_to_joint_states.hpp>                                   // Custom action built in another project
+//#include <Trajectory/Spline.h>                                                                      // Use this to generate trajectories
 
 // Short definitions for actions
 using MoveToJointStates = serial_link_interfaces::action::MoveToJointStates;
@@ -54,13 +55,13 @@ class ActionServerBase : public rclcpp::Node
            * @return ACCEPT (so far)
            */
           static rclcpp_action::CancelResponse
-          stop(const std::shared_ptr<JointPositionsManager> requestManager);
+          stop(const std::shared_ptr<MoveToJointStatesManager> requestManager);
           
           /**
            * Solve the feedback control to follow a joint trajectory.
            */
           static void
-          track_joint_trajectory(const std::shared_ptr<JointPositionsManager> requestManager);
+          track_joint_trajectory(const std::shared_ptr<MoveToJointStatesManager> requestManager);
           
 };                                                                                                  // Semicolon needed after class declaration
 
@@ -74,72 +75,85 @@ ActionServerBase<ControlType>::move_to_joint_positions(const rclcpp_action::Goal
 {
      (void)uuid;                                                                                    // This stops colcon from throwing a warning
     
-     // Ensure the dimensions of inputs are sound
-     if(request->waypoints.size() < 2)
+     // Check that the tolerances match the number of joints in the model
+     unsigned int numberOfJoints = this->_controller->model.number_of_joints();                     // Simplifies things a little
+     
+     if(request->position_tracking_tolerance.size() != numberOfJoints
+     or request->end_position_tolerance.size() != numberOfJoints)
      {
-          std::string errorMessage = "A minimum number of 2 waypoints is required to generate a "
-                                     "trajectory, but received only " + std::to_string(request->waypoints.size()) + ".";
-                                     
-          RCLCPP_ERROR(this->get_logger(), errorMessage.c_str());                                   
+          std::string errorMessage = "This model has " + std::to_string(numberOfJoints) + " joints "
+                                     "but the position tracking tolerance array had "
+                                     + std::to_string(request->position_tracking_tolerance.size()) + 
+                                     " elements, and the end position tolerance array had "
+                                     + std::to_string(request->end_position_tolerance.size()) + " elements.";
           
-          return rclcpp_actin::GoalResponse::REJECT;
+          return rclcpp_action::GoalResponse::REJECT;
      }
      
+     // Check that each waypoint is sound
+     double previousTime;                                                                           // Used to check timing is correct
+     unsigned int waypointNumber = 1;                                                               // For keeping track
      
      for(auto waypoint : request->waypoints)
      {
-          if(waypoint.position.size() != this->_controller->model.number_of_joints())
+          // Check that dimensions match number of joints in robot model
+          if(waypoint.position.size() != numberOfJoints
+          or(waypoint.velocity.size() > 0     and waypoint.velocity.size()     != numberOfJoints)
+          or(waypoint.acceleration.size() > 0 and waypoint.acceleration.size() != numberOfJoints))
           {
-               std::string errorMessage = "
-     }
-    
-    
-
-     else if(request->times.size() != request->waypoints.size())
-     {
-          std::string errorMessage = "Number of waypoints does not equal number of times ("
-                                   + std::to_string(request->waypoints.size()) + " =/= "
-                                   + std::to_string(request->times.size());
-                                   
-          RCLCPP_ERROR(this->get_logger(), errorMessage.c_str());                                   // Convert to char and publish
+               std::string errorMessage = "This model has " + std::to_string(numberOfJoints) + " joints "
+                                          "but the position array for waypoint " + std::to_string(waypointNumber) + " "
+                                          "had " + std::to_string(waypoint.position.size()) + " elements, "
+                                          "the velocity array had " + std::to_string(waypoint.velocity.size()) + " elements, and "
+                                          "the acceleration array had " + std::to_string(waypoint.acceleration.size()) + " elements.";
+                                          
+               return rclcpp_action::GoalResponse::REJECT;
+          }                 
           
-          return rclcpp_action::GoalResponse::REJECT;
-     }
-     else if(this->_controller->model->number_of_joints() != request->tracking_tolerance.size()
-          or this->_controller->model->number_of_joints() != request->final_tolerance.size())
-     {
-          std::string errorMessage = "This robot has "
-                                   + std::to_string(this->_controller->model->number_of_joints()) + 
-                                    " but the tracking tolerance array had " + request->tracking_tolerance.size() +
-                                    " elements, and the final tolerance array had "
-                                   + request->final_tolerance.size() + " elements.";
+          // Check that the times are in ascending order
+          if(waypointNumber == 1 and waypoint.time < 0)
+          {
+               std::string errorMessage = "Time for the first waypoint was " + std::to_string(waypoint.time) + ", "
+                                          "but cannot be negative.";
+                                          
+               return rclcpp_action::GoalResponse::REJECT;
+          }
+          else if(waypointNumber > 1 and waypoint.time <= previousTime)
+          {
+               std::string errorMessage  = "Time for waypoint " + std::to_string(waypointNumber) + " "
+                                           "was less than the previous time (" + std::to_string(waypoint.time) +
+                                           " > " + std::to_string(previousTime) + ").";
+               
+               return rclcpp_action::GoalResponse::REJECT;
+          } 
           
-          RCLCPP_ERROR(this->get_logger(), errorMessage.c_str());
-          
-          return rclcpp_action::GoalResponse::REJECT;
+          previousTime = waypoint.time;                                                             // Save for next loop
      }
      
-     // 
      
-     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+     
+     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;                                        // Call track_joint_trajectory()
 } 
 
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                   Solve the feedback control to track a joint trajectory                       //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-void track_joint_trajectory(const std::shared_ptr<JointPositionsManager> requestManager)
+void track_joint_trajectory(const std::shared_ptr<MoveToJointStatesManager> requestManager)
 {
      (void)requestManager;
      
-     // These insane declarations are a consequence of the new ROS coding paradigm ಠ_ಠ
+     // These insane declarations are a consequence of the new ROS2 coding paradigm ಠ_ಠ
      MoveToJointStates::Feedback::SharedPtr feedback
-     = std::make_shared<MoveToJointStates::Feedback>();                                          // This is contains information on tracking performance for the user
+     = std::make_shared<MoveToJointStates::Feedback>();                                             // This is contains real-time performance data for the user
      
      MoveToJointStates::Result::SharedPtr result
-     = std::make_shared<MoveToJointStates::Result>();                                            
+     = std::make_shared<MoveToJointStates::Result>();                                               // This contains a performance summary at the end
      
-     rclcpp::Rate loopRate(1);
+     rclcpp::Rate loopRate(1);                                                                      // Sets the frequency of the control thread
+     
+     
+     // ↓↓↓ This is just for testing ↓↓↓
      
      unsigned int counter = 1;
      
