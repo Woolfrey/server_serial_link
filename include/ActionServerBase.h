@@ -1,12 +1,12 @@
 #include <rclcpp/rclcpp.hpp>                                                                        // ROS2 C++ libraries
 #include <rclcpp_action/rclcpp_action.hpp>                                                          // ROS2 action libaries
-#include <serial_link_interfaces/action/move_to_joint_positions.hpp>                                // Custom action built in another project
+#include <serial_link_interfaces/action/move_to_joint_states.hpp>                                   // Custom action built in another project
 
 // Short definitions for actions
-using MoveToJointPositions = serial_link_interfaces::action::MoveToJointPositions;
+using MoveToJointStates = serial_link_interfaces::action::MoveToJointStates;
 
 // Short definitions for goal handler
-using JointPositionsManager = rclcpp_action::ServerGoalHandle<MoveToJointPositions>;
+using MoveToJointStatesManager = rclcpp_action::ServerGoalHandle<MoveToJointStates>;
 
 template <class ControlType>
 class ActionServerBase : public rclcpp::Node
@@ -24,7 +24,7 @@ class ActionServerBase : public rclcpp::Node
                
               // Create & advertise the action for moving to multiple joint positions
               // this->_jointPositionsServer
-              // = rclcpp_action::create_server<MoveToJointPositions>(this,
+              // = rclcpp_action::create_server<MoveToJointStates>(this,
               //                                                     "move_to_joint_positions",
               //                                                     std::bind(&ActionServerBase::move_to_joint_positions))
           }
@@ -35,17 +35,17 @@ class ActionServerBase : public rclcpp::Node
      
           ControlType _controller;                                                                  // Template parameter for a RobotLibrary serial link controller
      
-          rclcpp_action::Server<MoveToJointPositions>::SharedPtr _jointPositionsServer;             // Action server for handling MoveToJointPositions request
+          rclcpp_action::Server<MoveToJointStates>::SharedPtr _jointPositionsServer;                // Action server for handling MoveToJointStates request
           
           /**
            * Processes action request to move to multiple joint positions.
            * @param uuid I don't know what this does 乁( ͡° ͜ʖ ͡°)ㄏ
-           * @param request The Goal component of the MoveToJointPositions action
+           * @param request The Goal component of the MoveToJointStates action
            * @return REJECT if request is not sound, otherwise ACCEPT_AND_EXECUTE
            */
           rclcpp_action::GoalResponse
           move_to_joint_positions(const rclcpp_action::GoalUUID &uuid,
-                                  std::shared_ptr<const MoveToJointPositions::Goal> &request);        
+                                  std::shared_ptr<const MoveToJointStates::Goal> &request);        
           
           /**
            * Stop the robot from moving.
@@ -70,7 +70,7 @@ class ActionServerBase : public rclcpp::Node
 template <class ControlType>
 rclcpp_action::GoalResponse
 ActionServerBase<ControlType>::move_to_joint_positions(const rclcpp_action::GoalUUID &uuid,
-                                                       std::shared_ptr<const MoveToJointPositions::Goal> &request)
+                                                       std::shared_ptr<const MoveToJointStates::Goal> &request)
 {
      (void)uuid;                                                                                    // This stops colcon from throwing a warning
     
@@ -79,7 +79,22 @@ ActionServerBase<ControlType>::move_to_joint_positions(const rclcpp_action::Goal
      {
           std::string errorMessage = "A minimum number of 2 waypoints is required to generate a "
                                      "trajectory, but received only " + std::to_string(request->waypoints.size()) + ".";
+                                     
+          RCLCPP_ERROR(this->get_logger(), errorMessage.c_str());                                   
+          
+          return rclcpp_actin::GoalResponse::REJECT;
      }
+     
+     
+     for(auto waypoint : request->waypoints)
+     {
+          if(waypoint.position.size() != this->_controller->model.number_of_joints())
+          {
+               std::string errorMessage = "
+     }
+    
+    
+
      else if(request->times.size() != request->waypoints.size())
      {
           std::string errorMessage = "Number of waypoints does not equal number of times ("
@@ -118,11 +133,11 @@ void track_joint_trajectory(const std::shared_ptr<JointPositionsManager> request
      (void)requestManager;
      
      // These insane declarations are a consequence of the new ROS coding paradigm ಠ_ಠ
-     MoveToJointPositions::Feedback::SharedPtr feedback
-     = std::make_shared<MoveToJointPositions::Feedback>();                                          // This is contains information on tracking performance for the user
+     MoveToJointStates::Feedback::SharedPtr feedback
+     = std::make_shared<MoveToJointStates::Feedback>();                                          // This is contains information on tracking performance for the user
      
-     MoveToJointPositions::Result::SharedPtr result
-     = std::make_shared<MoveToJointPositions::Result>();                                            
+     MoveToJointStates::Result::SharedPtr result
+     = std::make_shared<MoveToJointStates::Result>();                                            
      
      rclcpp::Rate loopRate(1);
      
