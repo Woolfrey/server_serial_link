@@ -1,7 +1,7 @@
 #include <rclcpp/rclcpp.hpp>                                                                        // ROS2 C++ libraries
 #include <rclcpp_action/rclcpp_action.hpp>                                                          // ROS2 action libaries
 #include <serial_link_interfaces/action/move_to_joint_states.hpp>                                   // Custom action built in another project
-//#include <Trajectory/Spline.h>                                                                      // Use this to generate trajectories
+#include <Trajectory/Spline.h>
 
 // Short definitions for actions
 using MoveToJointStates = serial_link_interfaces::action::MoveToJointStates;
