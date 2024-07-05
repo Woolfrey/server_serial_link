@@ -24,13 +24,33 @@ find_package(Eigen3 REQUIRED)                                                   
 ####################################################################################################
 #                                  MESSAGE & ACTION DEFINITIONS                                    #        
 ####################################################################################################
-add_executable(action_test test/test.cpp)
-ament_target_dependencies(action_test "ament_cmake" "rclcpp" "rclcpp_action" "serial_link_interfaces")
-target_link_libraries(action_test RobotLibrary::RobotLibrary Eigen3::Eigen)
-   
+
+########################################### Server #################################################
+add_executable(test_server test/test_server.cpp)
+               
+ament_target_dependencies(test_server
+                          "ament_cmake"
+                          "rclcpp"
+                          "rclcpp_action"
+                          "serial_link_interfaces")
+                          
+target_link_libraries(test_server Eigen3::Eigen RobotLibrary::RobotLibrary)
+
+######################################## Client ####################################################                        
+add_executable(test_client test/test_client.cpp)
+               
+ament_target_dependencies(test_client
+                          "ament_cmake"
+                          "rclcpp"
+                          "rclcpp_action"
+                          "serial_link_interfaces")
+                          
+target_link_libraries(test_client Eigen3::Eigen RobotLibrary::RobotLibrary)
+
 # This is so ROS2 can find the package                                               
 install(TARGETS
-        action_test
+        test_server
+        test_client
         DESTINATION lib/${PROJECT_NAME})
 
 ament_package()
