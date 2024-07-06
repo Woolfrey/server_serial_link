@@ -4,6 +4,30 @@
  * @data   June 2024
  * @brief  A ROS2 action server for joint trajectory tracking.
  */
+ 
+/*
+# Goal:
+JointTrajectoryPoint[] points               # Joint state at a particular time on the trajectory
+float64[] position_tracking_tolerance       # Maximum permissable error on joint positions while in motion
+float64[] final_position_tolerance          # Maximum permissable error for final position
+float64 delay 0.0                           # How long before the robot should start moving
+int32 polynomial_order 3                    # Degrees of freedom in the interpolating polynomial
+# Result:
+Statistics[] position_error                 # Contains information on mean, variance, min, max
+int32 successful                            # Error code
+int32 SUCCESSFUL = 1                        # As it says on the label
+int32 INVALID_ARGUMENTS = -1                # Bad input arguments
+int32 TRACKING_TOLERANCE_VIOLATED = -2      # Position tracking error is too large
+int32 FINAL_TOLERANCE_VIOLATED = -3         # End point position error is too large
+int32 CANCELLED = -4                        # Cancelled
+int32 OTHER = -5                            # Something else
+string message                              # Explanation of problem
+# Feedback:
+JointState actual                           # Actual state measured from joint sensors
+JointState desired                          # Desired state from trajectory generator
+JointState error                            # Difference between desired and actual
+float64 time_remaining                      # Until completion
+*/
 
 #ifndef TRACKJOINTTRAJECTORY_H_
 #define TRACKJOINTTRAJECTORY_H_
@@ -24,26 +48,18 @@ class TrackJointTrajectory : public rclcpp::Node
          * Constructor for the class.
          * @param options I have no idea what this does ¯\_(ツ)_/¯
          */
-        TrackJointTrajectory(const rclcpp::NodeOptions &options = rclcpp::NodeOptions())
-                             : Node("joint_trajectory_tracking_server", options)
-        {
-            using namespace std::placeholders;
-            
-            this->_actionServer = rclcpp_action::create_server<JointControlAction>
-            (this,
-             "track_joint_trajectory",
-             std::bind(&TrackJointTrajectory::request_joint_control, this, _1, _2),
-             std::bind(&TrackJointTrajectory::cancel, this, _1),
-             std::bind(&TrackJointTrajectory::track_joint_trajectory,this,_1)
-            );
-                                                                                  
-            RCLCPP_INFO(this->get_logger(), "Server initiated. Awaiting action request.");
-        }
+        TrackJointTrajectory(const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
     
     private:
-    
-        rclcpp_action::Server<JointControlAction>::SharedPtr _actionServer;                         // This is the fundamental object
+
+        unsigned int numJoints = 3; // CHANGE THIS IN FUTURE
+            
+        rclcpp_action::Server<JointControlAction>::SharedPtr _actionServer;                         // This is the foundation for the class
         
+        auto _feedback = std::make_shared<JointControlAction::Feedback>();                          // Use this to store feedback
+        
+        serial_link_interfaces::msg::Statistics _errorStatistics;                                   // Stored data on position tracking error
+
         /**
          * Processes the request for the TrackJointTrajectory action.
          * @param uuid I have no idea what this does ¯\_(ツ)_/¯
@@ -53,106 +69,166 @@ class TrackJointTrajectory : public rclcpp::Node
         inline
         rclcpp_action::GoalResponse
         request_joint_control(const rclcpp_action::GoalUUID &uuid,
-                              std::shared_ptr<const JointControlAction::Goal> request)
-        {
-            (void)uuid;
-            (void)request;
-            
-            RCLCPP_INFO(this->get_logger(), "Request for joint trajectory tracking received.");
-            
-            // NOTE TO SELF: Create the trajectory here? If it fails, reject.
-            
-            return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;                                // This immediately calls `track_joint_trajectory()`
-        }
+                              std::shared_ptr<const JointControlAction::Goal> request);
         
         /**
-         * Handles the cancel request.
+         * Processes the cancel request.
+         * @param actionManager A pointer to the rclcpp::ServerGoalHandle for this action
+         * @return rclcpp_action::CancelResponse::ACCEPT
          */
         inline
         rclcpp_action::CancelResponse
-        cancel(const std::shared_ptr<JointControlManager> actionManager)
-        {
-            RCLCPP_INFO(this->get_logger(), "Received request to cancel joint trajectory tracking.");
-            
-            (void)actionManager;                                                                    // This stops any warnings during compilation
-            
-            return rclcpp_action::CancelResponse::ACCEPT;
-        }
+        cancel(const std::shared_ptr<JointControlManager> actionManager);
         
         /**
          * This is the main control loop for joint trajectory tracking.
+         * @param actionManager A pointer to the rclcpp::ServerGoalHandle for this action
          */
         inline
         void
-        track_joint_trajectory(const std::shared_ptr<JointControlManager> actionManager)
-        {
-            auto request = actionManager->get_goal();                                               // Retrieve goal
-            auto result  = std::make_shared<JointControlAction::Result>();                          // Use this to store the result
-            auto feedback = std::make_shared<JointControlAction::Feedback>();
-            
-            // Timing stuff
-            rclcpp::Clock timer;                                                                    // Clock object
-            double startTime = timer.now().seconds();
-            double elapsedTime;                                                                     // Used in the control loop
-            
-            ////////////////////////////////////////////////////////////////////////////////////////
-            if(request->delay > 0.0)
-            {
-                RCLCPP_INFO(this->get_logger(), "Delay requested. Counting down.");
-                
-                feedback->time_remaining = 1.0;                                                     // Arbitrary
-                while(rclcpp::ok())
-                {
-                    feedback->time_remaining = request->delay - (timer.now().seconds() - startTime); // As it says
-                    
-                    // I have to do this weird check because it wasn't breaking the loop correctly
-                    if(feedback->time_remaining <= 0.0) break;
-                    else
-                    {             
-                        RCLCPP_INFO(this->get_logger(), "%i", (int)feedback->time_remaining);       // Round down to whole second
-                        rclcpp::sleep_for(std::chrono::seconds(1));
-                    }
-                }
-            }
-                
-            ////////////////////////////////////////////////////////////////////////////////////////
-            
-            rclcpp::Rate loopRate(0.5);                                                             // This regulates the control frequency
-
-            unsigned int count = 1;
-            
-            RCLCPP_INFO(this->get_logger(), "Executing joint trajectory tracking.");
-            
-            do
-            {   
-                     elapsedTime = timer.now().seconds() - startTime;
-                     
-                     if(count == 1) 
-                     {
-                        RCLCPP_INFO(this->get_logger(), "Worker bees can leave.");
-                        count++;
-                     }
-                    else if(count == 2)
-                    {
-                        RCLCPP_INFO(this->get_logger(), "Even drones can fly away.");
-                        count++;
-                    }
-                    else
-                    {
-                        RCLCPP_INFO(this->get_logger(), "The Queen is their slave.");
-                        count = 1;
-                    }
-                
-                loopRate.sleep();                                                                   // Synchronize
-                
-            }while(rclcpp::ok() and elapsedTime <= request->points.back().time);
-            
-            if(rclcpp::ok())
-            {
-                actionManager->succeed(result);
-                RCLCPP_INFO(this->get_logger(), "Trajectory tracking complete.");
-            }
-        }    
+        track_joint_trajectory(const std::shared_ptr<JointControlManager> actionManager);
+        
 };                                                                                                  // Semicolon required after a class declaration
 
+  ////////////////////////////////////////////////////////////////////////////////////////////////////
+ //                                            Constructor                                         //
+////////////////////////////////////////////////////////////////////////////////////////////////////
+TrackJointTrajectory::TrackJointTrajectory(const rclcpp::NodeOptions &options = rclcpp::NodeOptions())
+                                           : Node("joint_tracking_server", options)
+{
+    using namespace std::placeholders;
+
+    this->_actionServer = rclcpp_action::create_server<JointControlAction>
+    (this, "track_joint_trajectory",
+     std::bind(&TrackJointTrajectory::request_joint_control, this, _1, _2),
+     std::bind(&TrackJointTrajectory::cancel, this, _1),
+     std::bind(&TrackJointTrajectory::track_joint_trajectory,this,_1));
+    
+    // Set the size of the arrays
+    this->_feedback->actual.position.resize(numJoints);
+    this->_feedback->actual.velocity.resize(numJoints);
+//  this->_feedback->actual.acceleration.resize(numJoints);                                         // Not available for actual joint state
+    this->_feedback->actual.effort.resize(numJoints);
+    
+    this->_feedback->desired.position.resize(numJoints);
+    this->_feedback->desired.velocity.resize(numJoints);
+    this->_feedback->desired.acceleration.resize(numJoints);                                        // Not available for desired joint state
+//  this->_feedback->desired.effort.resize(numJoints);
+    
+    this->_feedback->error.position.resize(numJoints);
+    this->_feedback->error.velocity.resize(numJoints);
+//  this->_feedback->error.acceleration.resize(numJoints);                                          // Not available for error
+//  this->_feedback->error.effort.resize(numJoints);                                                // Not available for error
+ 
+    this->_errorStatistics.resize(numJoints);                                                       // Data on position tracking error
+                                                                          
+    RCLCPP_INFO(this->get_logger(), "Server initiated. Awaiting action request.");
+}
+
+  ////////////////////////////////////////////////////////////////////////////////////////////////////
+ //                    Process a request to perform joint trajectory tracking                      //
+////////////////////////////////////////////////////////////////////////////////////////////////////
+inline
+rclcpp_action::GoalResponse
+TrackJointTrajectory::request_tracking(const rclcpp_action::GoalUUID &uuid,
+                                       std::shared_ptr<const JointControlAction::Goal> request)
+{
+    (void)uuid;
+    (void)request;
+    
+    RCLCPP_INFO(this->get_logger(), "Request for joint trajectory tracking received.");
+    
+    // NOTE TO SELF: Create the trajectory here? If it fails, reject.
+    
+    return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;                                         // This immediately calls `track_joint_trajectory()`
+}
+ 
+  ////////////////////////////////////////////////////////////////////////////////////////////////////
+ //                          Cancel a joint trajectory tracking action                             //
+////////////////////////////////////////////////////////////////////////////////////////////////////
+inline
+rclcpp_action::CancelResponse
+TrackJointTrajectory::cancel(const std::shared_ptr<JointControlManager> actionManager)
+{ 
+    RCLCPP_INFO(this->get_logger(), "Received request to cancel joint trajectory tracking.");
+    
+    auto result = std::make_shared<JointControlAction::Result>();                                   // Result portion of the action          
+    result->successful = -4;                                                                        // CANCELLED
+    result->message = "Action cancelled.";                                                          // Info for the client
+    
+    actionManager->cancelled(result);                                                               // Put the result in 
+
+    return rclcpp_action::CancelResponse::ACCEPT;
+}
+
+  ////////////////////////////////////////////////////////////////////////////////////////////////////
+ //                                       MAIN CONTROL LOOP                                        //
+////////////////////////////////////////////////////////////////////////////////////////////////////
+inline
+void
+TrackJointTrajectory::track_joint_trajectory(const std::shared_ptr<JointControlManager> actionManager)
+{
+    // These need to be removed / replaced in future:
+    unsigned int count = 1;                                                                         // To be removed in future
+    rclcpp::Rate loopRate(0.5);                                                                     // This regulates the control frequency
+
+    // Variables used in this scope
+    auto request  = actionManager->get_goal();                                                      // Retrieve goal
+    
+    for(auto error : this->_errorStatistics)
+    {
+        error.mean     = 0.0;
+        error.min      = 0.0;
+        error.max      = 0.0;
+        error.variance = 0.0;
+    }
+        
+    // Variables used for timing
+    rclcpp::Clock timer;                                                                            // Clock object
+    double startTime = timer.now().seconds();                                                       // Start the timer
+    double elapsedTime;                                                                             // Used in the control loop
+    
+    // Delay the start of the trajectory tracing
+    if(request->delay > 0.0)
+    {
+        RCLCPP_INFO(this->get_logger(), "Counting down...");
+        
+        while(rclcpp::ok())
+        {
+            feedback->time_remaining = request->delay - (timer.now().seconds() - startTime);        // As it says
+            
+            if(feedback->time_remaining <= 0.0) break;                                              // I have to do this weird check because it wasn't breaking the loop correctly
+            else
+            {             
+                RCLCPP_INFO(this->get_logger(), "%i", (int)feedback->time_remaining);               // Round down to whole second
+                rclcpp::sleep_for(std::chrono::seconds(1));
+            }
+        }
+    }
+    
+    // Run the control
+    RCLCPP_INFO(this->get_logger(), "Executing joint trajectory tracking.");
+    startTime = timer.now().seconds();                                                              // (Re)start the timer
+    do
+    {   
+        elapsedTime = timer.now().seconds() - startTime;                                            // Get the elapsed time since the start
+
+        // 
+        
+             if(count == 1) RCLCPP_INFO(this->get_logger(), "Worker bees can leave.");    count++;
+        else if(count == 2) RCLCPP_INFO(this->get_logger(), "Even drones can fly away."); count++;
+        else                RCLCPP_INFO(this->get_logger(), "The Queen is their slave."); count = 1;
+
+        loopRate.sleep();                                                                           // Synchronize
+        
+    }while(rclcpp::ok() and elapsedTime <= request->points.back().time); // NOTE: Using do/while can fail with the timer here?
+    
+    // Send the result to the client
+    if(rclcpp::ok())
+    {
+        actionManager->succeed(result);                                                             // Fill in the result message
+        RCLCPP_INFO(this->get_logger(), "Trajectory tracking complete.");
+    }
+}
+            
 #endif
