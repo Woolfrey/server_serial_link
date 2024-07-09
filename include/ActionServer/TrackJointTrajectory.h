@@ -56,7 +56,7 @@ class TrackJointTrajectory : public rclcpp::Node
             
         rclcpp_action::Server<JointControlAction>::SharedPtr _actionServer;                         // This is the foundation for the class
         
-        auto _feedback = std::make_shared<JointControlAction::Feedback>();                          // Use this to store feedback
+ //       auto _feedback = std::make_shared<JointControlAction::Feedback>();                          // Use this to store feedback
         
         serial_link_interfaces::msg::Statistics _errorStatistics;                                   // Stored data on position tracking error
 
@@ -68,8 +68,8 @@ class TrackJointTrajectory : public rclcpp::Node
          */
         inline
         rclcpp_action::GoalResponse
-        request_joint_control(const rclcpp_action::GoalUUID &uuid,
-                              std::shared_ptr<const JointControlAction::Goal> request);
+        request_tracking(const rclcpp_action::GoalUUID &uuid,
+                         std::shared_ptr<const JointControlAction::Goal> request);
         
         /**
          * Processes the cancel request.
@@ -93,17 +93,17 @@ class TrackJointTrajectory : public rclcpp::Node
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                                            Constructor                                         //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-TrackJointTrajectory::TrackJointTrajectory(const rclcpp::NodeOptions &options = rclcpp::NodeOptions())
+TrackJointTrajectory::TrackJointTrajectory(const rclcpp::NodeOptions &options)
                                            : Node("joint_tracking_server", options)
 {
     using namespace std::placeholders;
 
     this->_actionServer = rclcpp_action::create_server<JointControlAction>
     (this, "track_joint_trajectory",
-     std::bind(&TrackJointTrajectory::request_joint_control, this, _1, _2),
+     std::bind(&TrackJointTrajectory::request_tracking, this, _1, _2),
      std::bind(&TrackJointTrajectory::cancel, this, _1),
      std::bind(&TrackJointTrajectory::track_joint_trajectory,this,_1));
-    
+   /* 
     // Set the size of the arrays
     this->_feedback->actual.position.resize(numJoints);
     this->_feedback->actual.velocity.resize(numJoints);
@@ -119,9 +119,9 @@ TrackJointTrajectory::TrackJointTrajectory(const rclcpp::NodeOptions &options = 
     this->_feedback->error.velocity.resize(numJoints);
 //  this->_feedback->error.acceleration.resize(numJoints);                                          // Not available for error
 //  this->_feedback->error.effort.resize(numJoints);                                                // Not available for error
- 
-    this->_errorStatistics.resize(numJoints);                                                       // Data on position tracking error
-                                                                          
+ **/
+  //  this->_errorStatistics.resize(numJoints);                                                       // Data on position tracking error
+                                                                         
     RCLCPP_INFO(this->get_logger(), "Server initiated. Awaiting action request.");
 }
 
@@ -156,14 +156,14 @@ TrackJointTrajectory::cancel(const std::shared_ptr<JointControlManager> actionMa
     result->successful = -4;                                                                        // CANCELLED
     result->message = "Action cancelled.";                                                          // Info for the client
     
-    actionManager->cancelled(result);                                                               // Put the result in 
+    actionManager->canceled(result);                                                                // Put the result in 
 
     return rclcpp_action::CancelResponse::ACCEPT;
 }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                                       MAIN CONTROL LOOP                                        //
-////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////       
 inline
 void
 TrackJointTrajectory::track_joint_trajectory(const std::shared_ptr<JointControlManager> actionManager)
@@ -174,14 +174,15 @@ TrackJointTrajectory::track_joint_trajectory(const std::shared_ptr<JointControlM
 
     // Variables used in this scope
     auto request  = actionManager->get_goal();                                                      // Retrieve goal
-    
+
+/*    
     for(auto error : this->_errorStatistics)
     {
         error.mean     = 0.0;
         error.min      = 0.0;
         error.max      = 0.0;
         error.variance = 0.0;
-    }
+    }*/
         
     // Variables used for timing
     rclcpp::Clock timer;                                                                            // Clock object
@@ -195,14 +196,15 @@ TrackJointTrajectory::track_joint_trajectory(const std::shared_ptr<JointControlM
         
         while(rclcpp::ok())
         {
-            feedback->time_remaining = request->delay - (timer.now().seconds() - startTime);        // As it says
+//            feedback->time_remaining = request->delay - (timer.now().seconds() - startTime);        // As it says
             
+            /*
             if(feedback->time_remaining <= 0.0) break;                                              // I have to do this weird check because it wasn't breaking the loop correctly
             else
             {             
                 RCLCPP_INFO(this->get_logger(), "%i", (int)feedback->time_remaining);               // Round down to whole second
                 rclcpp::sleep_for(std::chrono::seconds(1));
-            }
+            }*/
         }
     }
     
@@ -213,11 +215,9 @@ TrackJointTrajectory::track_joint_trajectory(const std::shared_ptr<JointControlM
     {   
         elapsedTime = timer.now().seconds() - startTime;                                            // Get the elapsed time since the start
 
-        // 
-        
-             if(count == 1) RCLCPP_INFO(this->get_logger(), "Worker bees can leave.");    count++;
-        else if(count == 2) RCLCPP_INFO(this->get_logger(), "Even drones can fly away."); count++;
-        else                RCLCPP_INFO(this->get_logger(), "The Queen is their slave."); count = 1;
+             if(count == 1) { RCLCPP_INFO(this->get_logger(), "Worker bees can leave.");    count++; }
+        else if(count == 2) { RCLCPP_INFO(this->get_logger(), "Even drones can fly away."); count++; }
+        else                { RCLCPP_INFO(this->get_logger(), "The Queen is their slave."); count = 1; }
 
         loopRate.sleep();                                                                           // Synchronize
         
@@ -226,7 +226,7 @@ TrackJointTrajectory::track_joint_trajectory(const std::shared_ptr<JointControlM
     // Send the result to the client
     if(rclcpp::ok())
     {
-        actionManager->succeed(result);                                                             // Fill in the result message
+//        actionManager->succeed(result);                                                             // Fill in the result message
         RCLCPP_INFO(this->get_logger(), "Trajectory tracking complete.");
     }
 }
