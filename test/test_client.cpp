@@ -48,13 +48,13 @@ int main(int argc, char **argv)
     startPoint.acceleration = {0.0, 0.0, 0.0};
     
     serial_link_interfaces::msg::JointTrajectoryPoint endPoint;
-    endPoint.time         = 3.0;
+    endPoint.time         = 20.0;
     endPoint.position     = {1.0, 0.0, 0.0};
     endPoint.velocity     = {0.0, 0.0, 0.0};
     endPoint.acceleration = {0.0, 0.0, 0.0};
     
     goal.points = {startPoint, endPoint};                                                           // Add them to the goal
-    goal.delay = 5.0;
+    goal.delay = 0.0;
    
     /////////////////////////////////////// Send to server /////////////////////////////////////////
     RCLCPP_INFO(node->get_logger(), "Sending goal.");

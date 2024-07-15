@@ -6,16 +6,16 @@
  */
 
 #include <ActionServer/TrackJointTrajectory.h>
-#include <RobotLibrary/Model/KinematicTree.h>
-#include <RobotLibrary/Control/SerialKinematicControl.h>
+#include <RobotLibrary/KinematicTree.h>
+#include <RobotLibrary/SerialKinematicControl.h>
 
 int main(int argc, char **argv)
 {
     rclcpp::init(argc, argv);                                                                       // Launches ROS2
     
-    KinematicTree<double> model("path.urdf"); // I NEED TO FIX THIS
+//    KinematicTree model("path.urdf"); // I NEED TO FIX THIS
     
-    SerialKinematicControl<double> controller(&model, "frame_name");
+//    SerialKinematicControl controller(&model, "frame_name");
     
     auto action_server = std::make_shared<TrackJointTrajectory>();                                  // Create the server
 

@@ -4,42 +4,24 @@
  * @data   June 2024
  * @brief  A ROS2 action server for joint trajectory tracking.
  */
- 
-/*
-# Goal:
-JointTrajectoryPoint[] points               # Joint state at a particular time on the trajectory
-float64[] position_tracking_tolerance       # Maximum permissable error on joint positions while in motion
-float64[] final_position_tolerance          # Maximum permissable error for final position
-float64 delay 0.0                           # How long before the robot should start moving
-int32 polynomial_order 3                    # Degrees of freedom in the interpolating polynomial
-# Result:
-Statistics[] position_error                 # Contains information on mean, variance, min, max
-int32 successful                            # Error code
-int32 SUCCESSFUL = 1                        # As it says on the label
-int32 INVALID_ARGUMENTS = -1                # Bad input arguments
-int32 TRACKING_TOLERANCE_VIOLATED = -2      # Position tracking error is too large
-int32 FINAL_TOLERANCE_VIOLATED = -3         # End point position error is too large
-int32 CANCELLED = -4                        # Cancelled
-int32 OTHER = -5                            # Something else
-string message                              # Explanation of problem
-# Feedback:
-JointState actual                           # Actual state measured from joint sensors
-JointState desired                          # Desired state from trajectory generator
-JointState error                            # Difference between desired and actual
-float64 time_remaining                      # Until completion
-*/
 
 #ifndef TRACKJOINTTRAJECTORY_H_
 #define TRACKJOINTTRAJECTORY_H_
 
-#include <serial_link_interfaces/action/track_joint_trajectory.hpp>                                 // Previously built package
+#include <Eigen/Dense>                                                                              // Can use Eigen::Map?
 #include <rclcpp/rclcpp.hpp>                                                                        // ROS2 C++ libraries
 #include <rclcpp_action/rclcpp_action.hpp>                                                          // ROS2 Action C++ libraries
+#include <serial_link_interfaces/action/track_joint_trajectory.hpp>                                 // Previously built package
+
+#include <RobotLibrary/SplineTrajectory.h>
 
 // Short naming conventions for easier referencing
 using JointControlAction = serial_link_interfaces::action::TrackJointTrajectory;
 using JointControlManager = rclcpp_action::ServerGoalHandle<JointControlAction>;
 
+/**
+ * This class performs joint trajectory tracking for a serial link robot arm.
+ */
 class TrackJointTrajectory : public rclcpp::Node
 {
     public:
@@ -52,14 +34,17 @@ class TrackJointTrajectory : public rclcpp::Node
     
     private:
 
-        unsigned int numJoints = 3; // CHANGE THIS IN FUTURE
+        unsigned int _numJoints = 3; // CHANGE THIS IN FUTURE
             
         rclcpp_action::Server<JointControlAction>::SharedPtr _actionServer;                         // This is the foundation for the class
         
- //       auto _feedback = std::make_shared<JointControlAction::Feedback>();                          // Use this to store feedback
+        std::shared_ptr<JointControlAction::Feedback> _feedback 
+        = std::make_shared<JointControlAction::Feedback>();                                         // Use this to store feedback
         
-        serial_link_interfaces::msg::Statistics _errorStatistics;                                   // Stored data on position tracking error
-
+        std::vector<serial_link_interfaces::msg::Statistics> _errorStatistics;                      // Stored data on position tracking error
+        
+        SplineTrajectory _trajectory;                                                               // Trajectory object
+        
         /**
          * Processes the request for the TrackJointTrajectory action.
          * @param uuid I have no idea what this does ¯\_(ツ)_/¯
@@ -102,25 +87,27 @@ TrackJointTrajectory::TrackJointTrajectory(const rclcpp::NodeOptions &options)
     (this, "track_joint_trajectory",
      std::bind(&TrackJointTrajectory::request_tracking, this, _1, _2),
      std::bind(&TrackJointTrajectory::cancel, this, _1),
-     std::bind(&TrackJointTrajectory::track_joint_trajectory,this,_1));
-   /* 
-    // Set the size of the arrays
-    this->_feedback->actual.position.resize(numJoints);
-    this->_feedback->actual.velocity.resize(numJoints);
-//  this->_feedback->actual.acceleration.resize(numJoints);                                         // Not available for actual joint state
-    this->_feedback->actual.effort.resize(numJoints);
+     std::bind(&TrackJointTrajectory::track_joint_trajectory,this,_1)
+    );
+ 
+    ///////////////// Set the size of arrays based on number of joints in robot model //////////////
     
-    this->_feedback->desired.position.resize(numJoints);
-    this->_feedback->desired.velocity.resize(numJoints);
-    this->_feedback->desired.acceleration.resize(numJoints);                                        // Not available for desired joint state
-//  this->_feedback->desired.effort.resize(numJoints);
+    this->_feedback->actual.position.resize(_numJoints);
+    this->_feedback->actual.velocity.resize(_numJoints);
+//  this->_feedback->actual.acceleration.resize(_numJoints);                                        // Not available for actual joint state
+    this->_feedback->actual.effort.resize(_numJoints);
     
-    this->_feedback->error.position.resize(numJoints);
-    this->_feedback->error.velocity.resize(numJoints);
-//  this->_feedback->error.acceleration.resize(numJoints);                                          // Not available for error
-//  this->_feedback->error.effort.resize(numJoints);                                                // Not available for error
- **/
-  //  this->_errorStatistics.resize(numJoints);                                                       // Data on position tracking error
+    this->_feedback->desired.position.resize(_numJoints);
+    this->_feedback->desired.velocity.resize(_numJoints);
+    this->_feedback->desired.acceleration.resize(_numJoints);                                       // Not available for desired joint state
+//  this->_feedback->desired.effort.resize(_numJoints);
+    
+    this->_feedback->error.position.resize(_numJoints);
+    this->_feedback->error.velocity.resize(_numJoints);
+//  this->_feedback->error.acceleration.resize(_numJoints);                                         // Not available for error
+//  this->_feedback->error.effort.resize(_numJoints);                                               // Not available for error
+    
+    this->_errorStatistics.resize(_numJoints);                                                      // Data on position tracking error
                                                                          
     RCLCPP_INFO(this->get_logger(), "Server initiated. Awaiting action request.");
 }
@@ -134,11 +121,39 @@ TrackJointTrajectory::request_tracking(const rclcpp_action::GoalUUID &uuid,
                                        std::shared_ptr<const JointControlAction::Goal> request)
 {
     (void)uuid;
-    (void)request;
     
     RCLCPP_INFO(this->get_logger(), "Request for joint trajectory tracking received.");
     
-    // NOTE TO SELF: Create the trajectory here? If it fails, reject.
+    // Get the trajectory data from the request
+    std::vector<double> times;
+    std::vector<Eigen::VectorXd> positions;
+    for(auto &point : request->points) 
+    {
+        if(point.position.size() != this->_numJoints)
+        {
+            return rclcpp_action::GoalResponse::REJECT;
+        }
+        
+        auto blah = point.position; // IMPROVE THIS?
+        Eigen::Map<Eigen::VectorXd> vectorMap(blah.data(), blah.size());
+        positions.emplace_back(vectorMap);
+        
+        times.push_back(point.time);
+    }
+    
+    // Try to create the trajectory
+    try
+    {
+        this->_trajectory = SplineTrajectory(positions, times,
+                                             Eigen::VectorXd::Zero(this->_numJoints));
+    }
+    catch(const std::exception &exception)
+    {
+        std::cerr << exception.what();  // NOTE: Need to send this back as the result message
+        
+        return rclcpp_action::GoalResponse::REJECT;
+    }
+
     
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;                                         // This immediately calls `track_joint_trajectory()`
 }
@@ -169,20 +184,19 @@ void
 TrackJointTrajectory::track_joint_trajectory(const std::shared_ptr<JointControlManager> actionManager)
 {
     // These need to be removed / replaced in future:
-    unsigned int count = 1;                                                                         // To be removed in future
-    rclcpp::Rate loopRate(0.5);                                                                     // This regulates the control frequency
+    rclcpp::Rate loopRate(100);                                                                     // This regulates the control frequency
 
     // Variables used in this scope
     auto request  = actionManager->get_goal();                                                      // Retrieve goal
-
-/*    
-    for(auto error : this->_errorStatistics)
+  
+    // Set initial values for error
+    for(auto &error : this->_errorStatistics)
     {
         error.mean     = 0.0;
         error.min      = 0.0;
         error.max      = 0.0;
         error.variance = 0.0;
-    }*/
+    }
         
     // Variables used for timing
     rclcpp::Clock timer;                                                                            // Clock object
@@ -196,15 +210,14 @@ TrackJointTrajectory::track_joint_trajectory(const std::shared_ptr<JointControlM
         
         while(rclcpp::ok())
         {
-//            feedback->time_remaining = request->delay - (timer.now().seconds() - startTime);        // As it says
+            this->_feedback->time_remaining = request->delay - (timer.now().seconds() - startTime); // As it says
             
-            /*
-            if(feedback->time_remaining <= 0.0) break;                                              // I have to do this weird check because it wasn't breaking the loop correctly
+            if(this->_feedback->time_remaining <= 0.0) break;                                       // I have to do this weird check because it wasn't breaking the loop correctly
             else
             {             
-                RCLCPP_INFO(this->get_logger(), "%i", (int)feedback->time_remaining);               // Round down to whole second
+                RCLCPP_INFO(this->get_logger(), "%i", (int)this->_feedback->time_remaining);        // Round down to whole second
                 rclcpp::sleep_for(std::chrono::seconds(1));
-            }*/
+            }
         }
     }
     
@@ -215,10 +228,26 @@ TrackJointTrajectory::track_joint_trajectory(const std::shared_ptr<JointControlM
     {   
         elapsedTime = timer.now().seconds() - startTime;                                            // Get the elapsed time since the start
 
-             if(count == 1) { RCLCPP_INFO(this->get_logger(), "Worker bees can leave.");    count++; }
-        else if(count == 2) { RCLCPP_INFO(this->get_logger(), "Even drones can fly away."); count++; }
-        else                { RCLCPP_INFO(this->get_logger(), "The Queen is their slave."); count = 1; }
-
+        // Get the desired state from the trajectory generator
+        const auto &[desiredPosition,
+                     desiredVelocity,
+                     desiredAcceleration] = this->_trajectory.query_state(elapsedTime);
+        
+        // Cycle through the joints
+        for(unsigned int j = 0; j < this->_numJoints; j++)
+        {
+            this->_feedback->desired.position[j]     = desiredPosition[j];
+            this->_feedback->desired.velocity[j]     = desiredVelocity[j];
+            this->_feedback->desired.acceleration[j] = desiredAcceleration[j];
+            
+            this->_errorStatistics[j].mean = (this->_feedback->error.position[j]
+                                           + (n-1)*this->_errorStatistics[j].mean)/n;
+            
+            
+        }
+        
+        actionManager->publish_feedback(this->_feedback);
+        
         loopRate.sleep();                                                                           // Synchronize
         
     }while(rclcpp::ok() and elapsedTime <= request->points.back().time); // NOTE: Using do/while can fail with the timer here?

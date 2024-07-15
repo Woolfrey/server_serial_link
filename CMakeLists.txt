@@ -21,6 +21,8 @@ find_package(serial_link_interfaces REQUIRED)                                   
 find_package(RobotLibrary REQUIRED)                                                                 # Custom classes for robot modeling & control
 find_package(Eigen3 REQUIRED)                                                                       # RobotLibrary relies on Eigen
 
+include_directories(${EIGEN3_INCLUDE_DIRS})
+
 ####################################################################################################
 #                                  MESSAGE & ACTION DEFINITIONS                                    #        
 ####################################################################################################
