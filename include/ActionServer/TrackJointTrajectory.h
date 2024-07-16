@@ -149,11 +149,12 @@ TrackJointTrajectory::request_tracking(const rclcpp_action::GoalUUID &uuid,
     }
     catch(const std::exception &exception)
     {
-        std::cerr << exception.what();  // NOTE: Need to send this back as the result message
+        RCLCPP_ERROR(this->get_logger(), exception.what());                                         // Print to console
         
         return rclcpp_action::GoalResponse::REJECT;
     }
 
+    RCLCPP_INFO(this->get_logger(), "Request accepted.");    
     
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;                                         // This immediately calls `track_joint_trajectory()`
 }
@@ -188,14 +189,15 @@ TrackJointTrajectory::track_joint_trajectory(const std::shared_ptr<JointControlM
 
     // Variables used in this scope
     auto request  = actionManager->get_goal();                                                      // Retrieve goal
-  
+    unsigned long long int n = 1;                                                                   // This is used for computing statistics
+      
     // Set initial values for error
     for(auto &error : this->_errorStatistics)
     {
         error.mean     = 0.0;
-        error.min      = 0.0;
-        error.max      = 0.0;
         error.variance = 0.0;
+        error.min      =  std::numeric_limits<double>::max();                                       // This is deliberate
+        error.max      =  std::numeric_limits<double>::lowest();
     }
         
     // Variables used for timing
@@ -236,27 +238,59 @@ TrackJointTrajectory::track_joint_trajectory(const std::shared_ptr<JointControlM
         // Cycle through the joints
         for(unsigned int j = 0; j < this->_numJoints; j++)
         {
+            // Update desired state
             this->_feedback->desired.position[j]     = desiredPosition[j];
             this->_feedback->desired.velocity[j]     = desiredVelocity[j];
             this->_feedback->desired.acceleration[j] = desiredAcceleration[j];
             
-            this->_errorStatistics[j].mean = (this->_feedback->error.position[j]
-                                           + (n-1)*this->_errorStatistics[j].mean)/n;
+            // Transfer actual state
+/*          this->_feedback->actual.position[j] = ...;
+            this->_feedback->actual.velocity[j] = ...;
+            this->_feedback->actual.effort[j]   = ...; */
             
+            // Update error
+            this->_feedback->error.position[j] = this->_feedback->desired.position[j]
+                                               - this->_feedback->actual.position[j];
+                                                                             
+            this->_feedback->error.velocity[j] = this->_feedback->desired.velocity[j]
+                                               - this->_feedback->actual.velocity[j];
+                                               
+            // Update performance statistics
+            double e = this->_feedback->error.position[j];                                          // Makes the code a little easier to work with
             
+            this->_errorStatistics[j].mean = ((n-1)*this->_errorStatistics[j].mean + e)/n;          
+            
+            this->_errorStatistics[j].min = std::min(this->_errorStatistics[j].min, e);
+            this->_errorStatistics[j].max = std::max(this->_errorStatistics[j].max, e);
+
+            if(n > 1)
+            {
+                this->_errorStatistics[j].variance = ((n-2)*this->_errorStatistics[j].variance 
+                + (n/(n-1))*pow((this->_errorStatistics[j].mean - e),2))/(n-1);
+            }            
+            
+            n++;                                                                                    // Increment counter
         }
         
-        actionManager->publish_feedback(this->_feedback);
+        actionManager->publish_feedback(this->_feedback);                                           // As it says
         
         loopRate.sleep();                                                                           // Synchronize
         
     }while(rclcpp::ok() and elapsedTime <= request->points.back().time); // NOTE: Using do/while can fail with the timer here?
     
+    RCLCPP_INFO(this->get_logger(), "Trajectory tracking complete.");
+    
     // Send the result to the client
     if(rclcpp::ok())
     {
-//        actionManager->succeed(result);                                                             // Fill in the result message
-        RCLCPP_INFO(this->get_logger(), "Trajectory tracking complete.");
+        auto result = std::make_shared<JointControlAction::Result>();
+        result->position_error = this->_errorStatistics;
+        result->successful = 1;
+        result->message = "Trajectory tracking complete.";    
+        
+        actionManager->succeed(result);                                                             // Fill in the result message
+        
+        RCLCPP_INFO(this->get_logger(), "Result sent to client. Awaiting new request.");
     }
 }
             

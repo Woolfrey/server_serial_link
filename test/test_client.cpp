@@ -84,6 +84,15 @@ int main(int argc, char **argv)
     if(result.code == rclcpp_action::ResultCode::SUCCEEDED)
     {
         RCLCPP_INFO(node->get_logger(), "Action succeeded.");
+        
+        for(auto &error : result.result->position_error)
+        {
+            std::cout << "---\n"
+                      << "Mean: " << error.mean << "\n"
+                      << "Variance: " << error.variance << "\n"
+                      << "Min: " << error.min << "\n"
+                      << "Max: " << error.max << "\n";
+        }
     }
     else
     {
