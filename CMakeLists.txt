@@ -15,6 +15,7 @@ include_directories(include)                                                    
 find_package(ament_cmake REQUIRED)                                                                  # I don't know what this does ¯\_(ツ)_/¯ 
 find_package(rclcpp REQUIRED)                                                                       # ROS2 C++ libraries
 find_package(rclcpp_action REQUIRED)                                                                # ROS2 C++ Action libraries
+find_package(sensor_msgs REQUIRED)                                                                  # ROS2 sensor message definitions
 find_package(serial_link_interfaces REQUIRED)                                                       # Previously built ROS2 package
 
 # RobotLibrary:
@@ -34,6 +35,7 @@ ament_target_dependencies(test_server
                           "ament_cmake"
                           "rclcpp"
                           "rclcpp_action"
+                          "sensor_msgs"
                           "serial_link_interfaces")
                           
 target_link_libraries(test_server Eigen3::Eigen RobotLibrary::RobotLibrary)

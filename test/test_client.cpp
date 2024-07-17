@@ -23,7 +23,7 @@ int main(int argc, char **argv)
     RCLCPP_INFO(node->get_logger(),
                 std::string("Waiting for action '" + actionName + "' to be advertised...").c_str());
    
-    ////////////////////////////////////// Wait for server ///////////////////////////////////////////
+    ////////////////////////////////////// Wait for server /////////////////////////////////////////
     if(not clientServer->wait_for_action_server(std::chrono::seconds(5)))
     {
         RCLCPP_ERROR(node->get_logger(),
