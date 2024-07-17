@@ -255,6 +255,8 @@ TrackJointTrajectory::track_joint_trajectory(const std::shared_ptr<JointControlM
             this->_feedback->error.velocity[j] = this->_feedback->desired.velocity[j]
                                                - this->_feedback->actual.velocity[j];
                                                
+            this->_feedback->time_remaining = this->_trajectory.end_time() - elapsedTime;
+                                               
             // Update performance statistics
             double e = this->_feedback->error.position[j];                                          // Makes the code a little easier to work with
             
@@ -276,7 +278,7 @@ TrackJointTrajectory::track_joint_trajectory(const std::shared_ptr<JointControlM
         
         loopRate.sleep();                                                                           // Synchronize
         
-    }while(rclcpp::ok() and elapsedTime <= request->points.back().time); // NOTE: Using do/while can fail with the timer here?
+    }while(rclcpp::ok() and elapsedTime < request->points.back().time); // NOTE: Using do/while can fail with the timer here?
     
     RCLCPP_INFO(this->get_logger(), "Trajectory tracking complete.");
     
