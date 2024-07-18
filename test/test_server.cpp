@@ -6,7 +6,7 @@
  */
 
 #include <ActionServer/TrackJointTrajectory.h>
-#include <Subscriber/JointStateSubscriber.h>
+#include <Subscriber/ModelUpdater.h>
 #include <RobotLibrary/SerialKinematicControl.h>
 
 int main(int argc, char **argv)
@@ -26,13 +26,13 @@ int main(int argc, char **argv)
     SerialKinematicControl controller(&robotModel, argv[2]);
     
     // Create the nodes necessary for coordinating the control server
-    auto actionServer         = std::make_shared<TrackJointTrajectory>(&controller);                // Runs joint control mode
-    auto jointStateSubscriber = std::make_shared<JointStateSubscriber>(&robotModel,&controller);    // Reads & updates joint state
+    auto actionServer = std::make_shared<TrackJointTrajectory>(&controller);                        // Runs joint control mode
+    auto modelUpdater = std::make_shared<ModelUpdater>(&robotModel);                                // Reads & updates joint state
     
     // Create multi-thread executor and add nodes
     rclcpp::executors::MultiThreadedExecutor executor;
     executor.add_node(actionServer);
-    executor.add_node(jointStateSubscriber);
+    executor.add_node(modelUpdater);
 
     executor.spin();                                                                                // Runs all the nodes on separate threads
 

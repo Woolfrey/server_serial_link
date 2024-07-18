@@ -36,7 +36,7 @@ class TrackJointTrajectory : public rclcpp::Node
     
     private:
 
-        unsigned int _numJoints = 3; // CHANGE THIS IN FUTURE
+        unsigned int _numJoints;
             
         rclcpp_action::Server<JointControlAction>::SharedPtr _actionServer;                         // This is the foundation for the class
         
@@ -85,6 +85,7 @@ class TrackJointTrajectory : public rclcpp::Node
 TrackJointTrajectory::TrackJointTrajectory(SerialKinematicControl *controller,
                                            const rclcpp::NodeOptions &options)
                                            : Node("joint_tracking_server", options),
+                                             _numJoints(controller->model()->number_of_joints()),
                                              _controller(controller)
 {
     using namespace std::placeholders;
@@ -126,9 +127,9 @@ rclcpp_action::GoalResponse
 TrackJointTrajectory::request_tracking(const rclcpp_action::GoalUUID &uuid,
                                        std::shared_ptr<const JointControlAction::Goal> request)
 {
-    (void)uuid;
+    (void)uuid;                                                                                     // Stops colcon from throwing a warning
     
-    RCLCPP_INFO(this->get_logger(), "Request for joint trajectory tracking received.");
+    RCLCPP_INFO(this->get_logger(), "Request for joint trajectory tracking received.");             // Notify user
     
     // Get the trajectory data from the request
     std::vector<double> times;
@@ -137,6 +138,11 @@ TrackJointTrajectory::request_tracking(const rclcpp_action::GoalUUID &uuid,
     {
         if(point.position.size() != this->_numJoints)
         {
+            std::string message = "Request rejected: Dimensions of trajectory point does not match number of joints in model "
+                                  "(" + std::to_string(point.position.size()) + " =/= " + std::to_string(this->_numJoints) + ").";
+                                  
+            RCLCPP_INFO(this->get_logger(), message.c_str());
+            
             return rclcpp_action::GoalResponse::REJECT;
         }
         
@@ -172,7 +178,8 @@ TrackJointTrajectory::cancel(const std::shared_ptr<JointControlManager> actionMa
 { 
     RCLCPP_INFO(this->get_logger(), "Received request to cancel joint trajectory tracking.");
     
-    auto result = std::make_shared<JointControlAction::Result>();                                   // Result portion of the action          
+    auto result = std::make_shared<JointControlAction::Result>();                                   // Result portion of the action  
+            
     result->successful = -4;                                                                        // CANCELLED
     
     actionManager->canceled(result);                                                                // Put the result in 
@@ -231,6 +238,8 @@ TrackJointTrajectory::track_joint_trajectory(const std::shared_ptr<JointControlM
     startTime = timer.now().seconds();                                                              // (Re)start the timer
     do
     {   
+        this->_controller->update();                                                                // As it says
+        
         elapsedTime = timer.now().seconds() - startTime;                                            // Get the elapsed time since the start
 
         // Get the desired state from the trajectory generator
@@ -247,9 +256,9 @@ TrackJointTrajectory::track_joint_trajectory(const std::shared_ptr<JointControlM
             this->_feedback->desired.acceleration[j] = desiredAcceleration[j];
             
             // Transfer actual state
-/*          this->_feedback->actual.position[j] = ...;
-            this->_feedback->actual.velocity[j] = ...;
-            this->_feedback->actual.effort[j]   = ...; */
+            this->_feedback->actual.position[j] = this->_controller->model()->joint_positions()[j];
+            this->_feedback->actual.position[j] = this->_controller->model()->joint_velocities()[j];
+/*          this->_feedback->actual.effort[j]   = ...; */
             
             // Update error
             this->_feedback->error.position[j] = this->_feedback->desired.position[j]
