@@ -6,17 +6,31 @@
  */
 
 #include <ActionServer/TrackJointTrajectory.h>
+#include <random>                                                                                   // For generating random numbers
 
 using JointControlAction = serial_link_interfaces::action::TrackJointTrajectory;
 
-std::string actionName = "track_joint_trajectory";
 
 int main(int argc, char **argv)
 {
+    if(argc != 3)
+    {
+        std::cerr << "[ERROR] [TEST CLIENT] Incorrect number of arguments. Usage:\n"
+                  << "ros2 run serial_link_action_server test_client robot_name numberOfJoints\n";
+        
+        return -1;
+    }
+    
+    std::string actionName = "track_joint_trajectory";                                              // Name of action
+    
+    int numJoints = std::stoi(argv[2]);                                                             // Convert to int
+    
     rclcpp::init(argc, argv);                                                                       // Launches ROS2
     
     //////////////////////////////////////// Create client /////////////////////////////////////////
-    auto node = rclcpp::Node::make_shared("test_node");                                             // Creates a node
+    std::string name = std::string(argv[1]) + "_test_client";
+    
+    auto node = rclcpp::Node::make_shared(name);                                                    // Creates a node
     
     auto clientServer = rclcpp_action::create_client<JointControlAction>(node, actionName);         // Attach the node to this client
     
@@ -39,19 +53,25 @@ int main(int argc, char **argv)
     
     //////////////////////////////////// Create trajectory points //////////////////////////////////
     auto goal = JointControlAction::Goal();
-    // NEED TO FILL IN DETAILS HERE
     
-    serial_link_interfaces::msg::JointTrajectoryPoint startPoint;
-    startPoint.time         = 0.0;
-    startPoint.position     = {0.0, 1.0,-1.0};
-    startPoint.velocity     = {0.0, 0.0, 0.0};
-    startPoint.acceleration = {0.0, 0.0, 0.0};
+    std::uniform_real_distribution<double> uniformDistribution(-1.0, 1.0);
+    std::default_random_engine randomEngine;
     
-    serial_link_interfaces::msg::JointTrajectoryPoint endPoint;
-    endPoint.time         = 20.0;
-    endPoint.position     = {1.0, 0.0, 0.0};
-    endPoint.velocity     = {0.0, 0.0, 0.0};
-    endPoint.acceleration = {0.0, 0.0, 0.0};
+    serial_link_interfaces::msg::JointTrajectoryPoint startPoint, endPoint;
+    
+    startPoint.time =  0.0;
+    endPoint.time   = 10.0;
+    
+    for(int i = 0; i < numJoints; i++)
+    {
+         startPoint.position.push_back(uniformDistribution(randomEngine));
+         startPoint.velocity.push_back(0.0);
+         startPoint.acceleration.push_back(0.0);
+         
+         endPoint.position.push_back(uniformDistribution(randomEngine));
+         endPoint.velocity.push_back(0.0);
+         endPoint.acceleration.push_back(0.0);
+    }
     
     goal.points = {startPoint, endPoint};                                                           // Add them to the goal
     goal.delay = 0.0;
