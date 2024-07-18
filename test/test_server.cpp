@@ -7,16 +7,34 @@
 
 #include <ActionServer/TrackJointTrajectory.h>
 #include <Subscriber/JointStateSubscriber.h>
+#include <RobotLibrary/SerialKinematicControl.h>
 
 int main(int argc, char **argv)
 {
     rclcpp::init(argc, argv);                                                                       // Launches ROS2
     
-    auto action_server = std::make_shared<TrackJointTrajectory>();                                  // Create the server
+    if(argc != 3)
+    {
+        throw std::invalid_argument("[ERROR] [TEST SERVER] Incorrect number of arguments. "
+                                    "Usage: ros2 run serial_link_action_server test_server path/to/model.urdf endpoint_name");
+        
+        return -1;
+    }
     
-    auto joint_state_sub = std::make_shared<JointStateSubscriber>();
+    KinematicTree robotModel(argv[1]);                                                              // Create the robot
+    
+    SerialKinematicControl controller(&robotModel, argv[2]);
+    
+    // Create the nodes necessary for coordinating the control server
+    auto actionServer         = std::make_shared<TrackJointTrajectory>(&controller);                // Runs joint control mode
+    auto jointStateSubscriber = std::make_shared<JointStateSubscriber>(&robotModel,&controller);    // Reads & updates joint state
+    
+    // Create multi-thread executor and add nodes
+    rclcpp::executors::MultiThreadedExecutor executor;
+    executor.add_node(actionServer);
+    executor.add_node(jointStateSubscriber);
 
-    rclcpp::spin(action_server);                                                                    // Run the server
+    executor.spin();                                                                                // Runs all the nodes on separate threads
 
     rclcpp::shutdown();                                                                             // Shuts down ROS2   
     

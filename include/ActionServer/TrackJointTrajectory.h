@@ -5,14 +5,14 @@
  * @brief  A ROS2 action server for joint trajectory tracking.
  */
 
-#ifndef TRACKJOINTTRAJECTORY_H_
-#define TRACKJOINTTRAJECTORY_H_
+#ifndef TRACKJOINTTRAJECTORY_H
+#define TRACKJOINTTRAJECTORY_H
 
 #include <Eigen/Dense>                                                                              // Can use Eigen::Map?
 #include <rclcpp/rclcpp.hpp>                                                                        // ROS2 C++ libraries
 #include <rclcpp_action/rclcpp_action.hpp>                                                          // ROS2 Action C++ libraries
 #include <serial_link_interfaces/action/track_joint_trajectory.hpp>                                 // Previously built package
-
+#include <RobotLibrary/SerialKinematicControl.h>
 #include <RobotLibrary/SplineTrajectory.h>
 
 // Short naming conventions for easier referencing
@@ -28,9 +28,11 @@ class TrackJointTrajectory : public rclcpp::Node
         
         /**
          * Constructor for the class.
+         * @param A pointer to a robot arm controller.
          * @param options I have no idea what this does ¯\_(ツ)_/¯
          */
-        TrackJointTrajectory(const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
+        TrackJointTrajectory(SerialKinematicControl *controller,
+                             const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
     
     private:
 
@@ -42,6 +44,8 @@ class TrackJointTrajectory : public rclcpp::Node
         = std::make_shared<JointControlAction::Feedback>();                                         // Use this to store feedback
         
         std::vector<serial_link_interfaces::msg::Statistics> _errorStatistics;                      // Stored data on position tracking error
+        
+        SerialKinematicControl* _controller;
         
         SplineTrajectory _trajectory;                                                               // Trajectory object
         
@@ -78,8 +82,10 @@ class TrackJointTrajectory : public rclcpp::Node
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                                            Constructor                                         //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-TrackJointTrajectory::TrackJointTrajectory(const rclcpp::NodeOptions &options)
-                                           : Node("joint_tracking_server", options)
+TrackJointTrajectory::TrackJointTrajectory(SerialKinematicControl *controller,
+                                           const rclcpp::NodeOptions &options)
+                                           : Node("joint_tracking_server", options),
+                                             _controller(controller)
 {
     using namespace std::placeholders;
 
@@ -153,8 +159,6 @@ TrackJointTrajectory::request_tracking(const rclcpp_action::GoalUUID &uuid,
         
         return rclcpp_action::GoalResponse::REJECT;
     }
-
-    RCLCPP_INFO(this->get_logger(), "Request accepted.");    
     
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;                                         // This immediately calls `track_joint_trajectory()`
 }
@@ -170,7 +174,6 @@ TrackJointTrajectory::cancel(const std::shared_ptr<JointControlManager> actionMa
     
     auto result = std::make_shared<JointControlAction::Result>();                                   // Result portion of the action          
     result->successful = -4;                                                                        // CANCELLED
-    result->message = "Action cancelled.";                                                          // Info for the client
     
     actionManager->canceled(result);                                                                // Put the result in 
 
@@ -292,7 +295,7 @@ TrackJointTrajectory::track_joint_trajectory(const std::shared_ptr<JointControlM
         
         actionManager->succeed(result);                                                             // Fill in the result message
         
-        RCLCPP_INFO(this->get_logger(), "Result sent to client. Awaiting new request.");
+        RCLCPP_INFO(this->get_logger(), "Awaiting new request.");
     }
 }
             
