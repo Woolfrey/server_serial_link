@@ -36,18 +36,18 @@ class TrackJointTrajectory : public rclcpp::Node
     
     private:
 
-        unsigned int _numJoints;
+        unsigned int _numJoints;                                                                    ///< Number of joints being controlled
             
-        rclcpp_action::Server<JointControlAction>::SharedPtr _actionServer;                         // This is the foundation for the class
+        rclcpp_action::Server<JointControlAction>::SharedPtr _actionServer;                         ///< This is the foundation for the class.
         
         std::shared_ptr<JointControlAction::Feedback> _feedback 
-        = std::make_shared<JointControlAction::Feedback>();                                         // Use this to store feedback
+        = std::make_shared<JointControlAction::Feedback>();                                         ///< Use this to store feedback
         
-        std::vector<serial_link_interfaces::msg::Statistics> _errorStatistics;                      // Stored data on position tracking error
+        std::vector<serial_link_interfaces::msg::Statistics> _errorStatistics;                      ///< Stored data on position tracking error
         
-        SerialKinematicControl* _controller;
+        SerialKinematicControl* _controller;                                                        ///< Pointer to the controller
         
-        SplineTrajectory _trajectory;                                                               // Trajectory object
+        SplineTrajectory _trajectory;                                                               ///< Trajectory object
         
         /**
          * Processes the request for the TrackJointTrajectory action.
@@ -84,7 +84,7 @@ class TrackJointTrajectory : public rclcpp::Node
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 TrackJointTrajectory::TrackJointTrajectory(SerialKinematicControl *controller,
                                            const rclcpp::NodeOptions &options)
-                                           : Node("joint_tracking_server", options),
+                                           : Node(controller->model()->name()+"_joint_tracking_server", options),
                                              _numJoints(controller->model()->number_of_joints()),
                                              _controller(controller)
 {
@@ -194,10 +194,8 @@ inline
 void
 TrackJointTrajectory::track_joint_trajectory(const std::shared_ptr<JointControlManager> actionManager)
 {
-    // These need to be removed / replaced in future:
-    rclcpp::Rate loopRate(100);                                                                     // This regulates the control frequency
-
     // Variables used in this scope
+    rclcpp::Rate loopRate(this->_controller.frequency());                                           // This regulates the control frequency
     auto request  = actionManager->get_goal();                                                      // Retrieve goal
     unsigned long long int n = 1;                                                                   // This is used for computing statistics
       
@@ -266,6 +264,11 @@ TrackJointTrajectory::track_joint_trajectory(const std::shared_ptr<JointControlM
                                                                              
             this->_feedback->error.velocity[j] = this->_feedback->desired.velocity[j]
                                                - this->_feedback->actual.velocity[j];
+                                               
+            if(abs(this->_feedback->error.position[j])> this->request->position_tracking_tolerance[j])
+            {
+                // STOP THE CONTROL
+            }
                                                
             this->_feedback->time_remaining = this->_trajectory.end_time() - elapsedTime;
                                                
