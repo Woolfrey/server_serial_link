@@ -6,8 +6,8 @@
  */
 
 #include <ActionServer/TrackJointTrajectory.h>
-#include <Subscriber/ModelUpdater.h>
 #include <RobotLibrary/SerialKinematicControl.h>
+#include <Subscriber/ModelUpdater.h>
 
 int main(int argc, char **argv)
 {
