@@ -17,6 +17,7 @@ find_package(rclcpp REQUIRED)                                                   
 find_package(rclcpp_action REQUIRED)                                                                # ROS2 C++ Action libraries
 find_package(sensor_msgs REQUIRED)                                                                  # ROS2 sensor message definitions
 find_package(serial_link_interfaces REQUIRED)                                                       # Previously built ROS2 package
+find_package(std_msgs REQUIRED)
 
 # RobotLibrary:
 find_package(RobotLibrary REQUIRED)                                                                 # Custom classes for robot modeling & control
@@ -29,32 +30,37 @@ include_directories(${EIGEN3_INCLUDE_DIRS})
 ####################################################################################################
 
 ########################################### Server #################################################
-add_executable(test_server test/test_server.cpp)
+add_executable(velocity_control_server src/velocity_control_server.cpp)
                
-ament_target_dependencies(test_server
+ament_target_dependencies(velocity_control_server
                           "ament_cmake"
                           "rclcpp"
                           "rclcpp_action"
                           "sensor_msgs"
-                          "serial_link_interfaces")
+                          "serial_link_interfaces"
+                          "std_msgs")
                           
-target_link_libraries(test_server Eigen3::Eigen RobotLibrary::RobotLibrary)
+target_link_libraries(velocity_control_server Eigen3::Eigen RobotLibrary::RobotLibrary)
 
 ######################################## Client ####################################################                        
-add_executable(test_client test/test_client.cpp)
+add_executable(test_client src/test_client.cpp)
                
 ament_target_dependencies(test_client
                           "ament_cmake"
                           "rclcpp"
                           "rclcpp_action"
-                          "serial_link_interfaces")
+                          "serial_link_interfaces"
+                          "std_msgs")
                           
 target_link_libraries(test_client Eigen3::Eigen RobotLibrary::RobotLibrary)
 
 # This is so ROS2 can find the package                                               
 install(TARGETS
-        test_server
+        velocity_control_server
         test_client
         DESTINATION lib/${PROJECT_NAME})
+        
+install(DIRECTORY launch
+DESTINATION share/${PROJECT_NAME}/launch)
 
 ament_package()
