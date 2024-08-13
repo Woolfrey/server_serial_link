@@ -20,5 +20,7 @@
    </export>
    
    <depend>sensor_msgs</depend>
+   <depend>std_msgs</depend>
+   <depend>serial_link_interfaces</depend>
    
 </package>
