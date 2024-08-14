@@ -8,7 +8,7 @@ from launch.substitutions import PythonExpression
 def generate_launch_description():
 
     urdf_path = '/home/woolfrey/workspace/colcon/src/server_serial_link/test/iiwa14.urdf' # CHANGE THIS
-
+    
     return LaunchDescription([
         
         # Model settings

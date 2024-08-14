@@ -25,8 +25,10 @@ int main(int argc, char **argv)
         
         SerialKinematicControl controller(&robotModel, endpointName);                               // Create controller, attach model
         
+        std::mutex mutex;                                                                           // Blocks 2 actions running simultaneously
+        
         // Create the nodes necessary for coordinating the control server
-        auto actionServer = std::make_shared<TrackJointTrajectory>(&controller);                    // Runs joint control mode
+        auto actionServer = std::make_shared<TrackJointTrajectory>(&controller, &mutex);            // Runs joint control mode
         auto modelUpdater = std::make_shared<ModelUpdater>(&robotModel);                            // Reads & updates joint state
         
         // Create multi-thread executor and add nodes

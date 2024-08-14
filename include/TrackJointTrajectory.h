@@ -9,12 +9,13 @@
 #define TRACKJOINTTRAJECTORY_H
 
 #include <Eigen/Dense>                                                                              // Can use Eigen::Map?
+#include <mutex>
 #include <rclcpp/rclcpp.hpp>                                                                        // ROS2 C++ libraries
 #include <rclcpp_action/rclcpp_action.hpp>                                                          // ROS2 Action C++ libraries
-#include <serial_link_interfaces/action/track_joint_trajectory.hpp>                                 // Previously built package
-#include <std_msgs/msg/float64_multi_array.hpp>
 #include <RobotLibrary/SerialKinematicControl.h>
 #include <RobotLibrary/SplineTrajectory.h>
+#include <serial_link_interfaces/action/track_joint_trajectory.hpp>                                 // Previously built package
+#include <std_msgs/msg/float64_multi_array.hpp>
 
 // Short naming conventions for easier referencing
 using JointControlAction = serial_link_interfaces::action::TrackJointTrajectory;
@@ -33,10 +34,13 @@ class TrackJointTrajectory : public rclcpp::Node
          * @param options I have no idea what this does ¯\_(ツ)_/¯
          */
         TrackJointTrajectory(SerialKinematicControl *controller,
+                             std::mutex *mutex,
                              const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
     
     private:
-
+        
+        std::mutex *_mutex;
+        
         unsigned int _numJoints;                                                                    ///< Number of joints being controlled
             
         rclcpp_action::Server<JointControlAction>::SharedPtr _actionServer;                         ///< This is the foundation for the class.
@@ -85,14 +89,16 @@ class TrackJointTrajectory : public rclcpp::Node
  //                                            Constructor                                         //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 TrackJointTrajectory::TrackJointTrajectory(SerialKinematicControl *controller,
+                                           std::mutex *mutex,
                                            const rclcpp::NodeOptions &options)
                                            : Node(controller->model()->name()+"_joint_tracking_server", options),
+                                             _mutex(mutex),
                                              _numJoints(controller->model()->number_of_joints()),
                                              _controller(controller)
 {
     using namespace std::placeholders;
 
-    this->_actionServer = rclcpp_action::create_server<JointControlAction>
+    _actionServer = rclcpp_action::create_server<JointControlAction>
     (this, "track_joint_trajectory",
      std::bind(&TrackJointTrajectory::request_tracking, this, _1, _2),
      std::bind(&TrackJointTrajectory::cancel, this, _1),
@@ -101,24 +107,20 @@ TrackJointTrajectory::TrackJointTrajectory(SerialKinematicControl *controller,
  
      _jointControlPublisher = this->create_publisher<std_msgs::msg::Float64MultiArray>("joint_commands", 1); 
      
-    ///////////////// Set the size of arrays based on number of joints in robot model //////////////
+    // Set the size of arrays based on number of joints in robot model
     
-    this->_feedback->actual.position.resize(_numJoints);
-    this->_feedback->actual.velocity.resize(_numJoints);
-//  this->_feedback->actual.acceleration.resize(_numJoints);                                        // Not available for actual joint state
-    this->_feedback->actual.effort.resize(_numJoints);
+    _feedback->actual.position.resize(_numJoints);
+    _feedback->actual.velocity.resize(_numJoints);
+    _feedback->actual.effort.resize(_numJoints);
     
-    this->_feedback->desired.position.resize(_numJoints);
-    this->_feedback->desired.velocity.resize(_numJoints);
-    this->_feedback->desired.acceleration.resize(_numJoints);                                       // Not available for desired joint state
-//  this->_feedback->desired.effort.resize(_numJoints);
+    _feedback->desired.position.resize(_numJoints);
+    _feedback->desired.velocity.resize(_numJoints);
+    _feedback->desired.acceleration.resize(_numJoints);                                             // Not available for desired joint state
     
-    this->_feedback->error.position.resize(_numJoints);
-    this->_feedback->error.velocity.resize(_numJoints);
-//  this->_feedback->error.acceleration.resize(_numJoints);                                         // Not available for error
-//  this->_feedback->error.effort.resize(_numJoints);                                               // Not available for error
+    _feedback->error.position.resize(_numJoints);
+    _feedback->error.velocity.resize(_numJoints);
     
-    this->_errorStatistics.resize(_numJoints);                                                      // Data on position tracking error
+    _errorStatistics.resize(_numJoints);                                                            // Data on position tracking error
                                                                          
     RCLCPP_INFO(this->get_logger(), "Server initiated. Awaiting action request.");
 }
@@ -133,46 +135,52 @@ TrackJointTrajectory::request_tracking(const rclcpp_action::GoalUUID &uuid,
 {
     (void)uuid;                                                                                     // Stops colcon from throwing a warning
 
-    RCLCPP_INFO(this->get_logger(), "Request for joint trajectory tracking received.");             // Notify user
-        
-    // Variables used in this scope
-    std::vector<double> times;                                                                      // For the waypoints on the trajectory
-    std::vector<Eigen::VectorXd> positions;                                                         // Defines the waypoints for the trajectory
-    
-    // Get the trajectory data from the request
-    for(auto &point : request->points) 
+    RCLCPP_INFO(this->get_logger(), "Request for joint trajectory tracking received.");
+
+    // Try to lock the mutex and reject if another action is running
+    if (!_mutex->try_lock())
     {
-        if(point.position.size() != this->_numJoints)
-        {
-            std::string message = "Request rejected: Dimensions of trajectory point does not match number of joints in model "
-                                  "(" + std::to_string(point.position.size()) + " =/= " + std::to_string(this->_numJoints) + ").";
-                                  
-            RCLCPP_INFO(this->get_logger(), message.c_str());                                       // Inform user
-            
-            return rclcpp_action::GoalResponse::REJECT;
-        }
-        
-        auto blah = point.position;                                                                 // Get the position component
-        Eigen::Map<Eigen::VectorXd> vectorMap(blah.data(), blah.size());                            // Create map between std::vector and Eigen::Vector
-        positions.emplace_back(vectorMap);                                                          // Transfer
-        
-        times.push_back(point.time);                                                                // Add time to the vector
+        RCLCPP_WARN(this->get_logger(), "Request rejected. Another action server is currently running.");
+        return rclcpp_action::GoalResponse::REJECT;
     }
 
-    // Try to create the trajectory
+    std::vector<double> times(1, 0.0);                                                              // Initialize times with the starting point
+    std::vector<Eigen::VectorXd> positions;                                                         // Waypoints for the trajectory
+    positions.reserve(request->points.size() + 1);                                                  // Reserve space for efficiency
+    positions.emplace_back(_controller->model()->joint_positions());                                // Start trajectory from current position
+
+    // Iterate over trajectory points in the request
+    for (const auto &point : request->points)
+    {
+        // Check dimension mismatch
+        if (point.position.size() != _numJoints)
+        {
+            RCLCPP_WARN(this->get_logger(),
+                        "Request rejected. Dimensions of trajectory point (%zu) do not match number of joints in model (%u).",
+                        point.position.size(), _numJoints);
+                        
+            return rclcpp_action::GoalResponse::REJECT;
+        }
+
+        times.push_back(point.time);                                                                // Add time to the vector
+
+        positions.emplace_back(Eigen::Map<const Eigen::VectorXd>(point.position.data(),
+                                                                 point.position.size()));
+    }
+
+    // Create the trajectory
     try
     {
-        this->_trajectory = SplineTrajectory(positions, times,
-                                             Eigen::VectorXd::Zero(this->_numJoints));              // Create new trajectory
+        _trajectory = SplineTrajectory(positions, times, _controller->model()->joint_velocities());
     }
-    catch(const std::exception &exception)
+    catch (const std::exception &exception)
     {
-        RCLCPP_ERROR(this->get_logger(), exception.what());                                         // Print to console
+        RCLCPP_ERROR(this->get_logger(), "Trajectory creation failed: %s", exception.what());
         
         return rclcpp_action::GoalResponse::REJECT;
     }
-    
-    return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;                                         // This immediately calls `track_joint_trajectory()`
+
+    return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;                                         // Return success and continue to execution
 }
  
   ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -181,7 +189,8 @@ TrackJointTrajectory::request_tracking(const rclcpp_action::GoalUUID &uuid,
 inline
 rclcpp_action::CancelResponse
 TrackJointTrajectory::cancel(const std::shared_ptr<JointControlManager> actionManager)
-{ 
+{   
+
     RCLCPP_INFO(this->get_logger(), "Received request to cancel joint trajectory tracking.");
     
     auto result = std::make_shared<JointControlAction::Result>();                                   // Result portion of the action  
@@ -189,6 +198,8 @@ TrackJointTrajectory::cancel(const std::shared_ptr<JointControlManager> actionMa
     result->successful = -2;                                                                        // CANCELLED
     
     actionManager->canceled(result);                                                                // Put the result in 
+    
+    _mutex->unlock();                                                                               // So other actions may be executed
 
     return rclcpp_action::CancelResponse::ACCEPT;
 }
@@ -200,129 +211,124 @@ inline
 void
 TrackJointTrajectory::track_joint_trajectory(const std::shared_ptr<JointControlManager> actionManager)
 {
-    // Variables used in this scope
     auto request = actionManager->get_goal();                                                       // Retrieve goal
     auto result = std::make_shared<JointControlAction::Result>();                                   // Stores the result statistics, message
-    rclcpp::Rate loopRate(this->_controller->frequency());                                          // This regulates the control frequency
-    unsigned long long int n = 1;                                                                   // This is used for computing statistics
-     
-     
-    std::cout << "Control frequency is: " << this->_controller->frequency() << std::endl;
-     
-      
-    // Set initial values for error
-    for(auto &error : this->_errorStatistics)
+    rclcpp::Rate loopRate(_controller->frequency());                                                // This regulates the control frequency
+    unsigned long long n = 1;                                                                       // This is used for computing statistics
+
+    // Initialize error statistics
+    for (auto &error : _errorStatistics)
     {
-        error.mean     = 0.0;
+        error.mean = 0.0;
         error.variance = 0.0;
-        error.min      =  std::numeric_limits<double>::max();                                       // This is deliberate
-        error.max      =  std::numeric_limits<double>::lowest();
+        error.min = std::numeric_limits<double>::max();
+        error.max = std::numeric_limits<double>::lowest();
     }
-        
-    // Variables used for timing
-    rclcpp::Clock timer;                                                                            // Clock object
-    double startTime = timer.now().seconds();                                                       // Start the timer
-    double elapsedTime;                                                                             // Used in the control loop
-    
-    // Delay the start of the trajectory tracking
-    if(request->delay > 0.0)
+
+    rclcpp::Clock timer;
+    double startTime = timer.now().seconds();
+
+    // Handle delay before starting trajectory tracking
+    if (request->delay > 0.0)
     {
         RCLCPP_INFO(this->get_logger(), "Counting down...");
         
-        while(rclcpp::ok())
+        while (rclcpp::ok())
         {
-            this->_feedback->time_remaining = request->delay - (timer.now().seconds() - startTime); // As it says
+            _feedback->time_remaining = request->delay - (timer.now().seconds() - startTime);
             
-            if(this->_feedback->time_remaining <= 0.0) break;                                       // I have to do this weird check because it wasn't breaking the loop correctly
-            else
-            {             
-                RCLCPP_INFO(this->get_logger(), "%i", (int)this->_feedback->time_remaining);        // Round down to whole second
-                rclcpp::sleep_for(std::chrono::seconds(1));
-            }
+            if (_feedback->time_remaining <= 0.0) break;
+            
+            RCLCPP_INFO(this->get_logger(), "%i", static_cast<int>(_feedback->time_remaining));
+            
+            rclcpp::sleep_for(std::chrono::seconds(1));
         }
     }
-    
-    // Run the control
-    RCLCPP_INFO(this->get_logger(), "Executing joint trajectory tracking.");
-    startTime = timer.now().seconds();                                                              // (Re)start the timer
-    do
-    {   
-        this->_controller->update();                                                                // As it says
-        
-        elapsedTime = timer.now().seconds() - startTime;                                            // Get the elapsed time since the start
 
-        // Get the desired state from the trajectory generator
+    // Start trajectory tracking
+    
+    RCLCPP_INFO(this->get_logger(), "Executing joint trajectory tracking.");
+    
+    startTime = timer.now().seconds();
+
+    double elapsedTime = 0.0;
+    
+    do
+    {
+        _controller->update();
+        
+        elapsedTime = timer.now().seconds() - startTime;
+        
         const auto &[desiredPosition,
                      desiredVelocity,
-                     desiredAcceleration] = this->_trajectory.query_state(elapsedTime);
-        
-        // Solve & publish the control          
+                     desiredAcceleration] = _trajectory.query_state(elapsedTime);
+
         Eigen::VectorXd control = _controller->track_joint_trajectory(desiredPosition,
                                                                       desiredVelocity,
                                                                       desiredAcceleration);
-
-        std_msgs::msg::Float64MultiArray msg;
-        msg.data = std::vector<double>(control.data(), control.data() + control.size());
+        
+        std_msgs::msg::Float64MultiArray msg;   
+        msg.data = {control.data(), control.data() + control.size()};
         
         _jointControlPublisher->publish(msg);
-        
-        // Fill out the Action feedback
-        for(unsigned int j = 0; j < this->_numJoints; j++)
+
+        // Update feedback and error statistics
+        for (unsigned int j = 0; j < _numJoints; ++j)
         {
-            // Update desired state
-            this->_feedback->desired.position[j]     = desiredPosition[j];
-            this->_feedback->desired.velocity[j]     = desiredVelocity[j];
-            this->_feedback->desired.acceleration[j] = desiredAcceleration[j];
-            
-            // Transfer actual state
-            this->_feedback->actual.position[j] = this->_controller->model()->joint_positions()[j];
-            this->_feedback->actual.position[j] = this->_controller->model()->joint_velocities()[j];
-            
-            // Update error
-            this->_feedback->error.position[j] = this->_feedback->desired.position[j]
-                                               - this->_feedback->actual.position[j];
-                                                                             
-            this->_feedback->error.velocity[j] = this->_feedback->desired.velocity[j]
-                                               - this->_feedback->actual.velocity[j];
-                                               
-            this->_feedback->time_remaining = this->_trajectory.end_time() - elapsedTime;
-                                               
+            // Update desired state in feedback
+            _feedback->desired.position[j]     = desiredPosition[j];
+            _feedback->desired.velocity[j]     = desiredVelocity[j];
+            _feedback->desired.acceleration[j] = desiredAcceleration[j];
+
+            // Update actual state in feedback
+            _feedback->actual.position[j]      = _controller->model()->joint_positions()[j];
+            _feedback->actual.velocity[j]      = _controller->model()->joint_velocities()[j];
+
+            // Compute and update error
+            double positionError = _feedback->desired.position[j] - _feedback->actual.position[j];
+            double velocityError = _feedback->desired.velocity[j] - _feedback->actual.velocity[j];
+
+            _feedback->error.position[j] = positionError;
+            _feedback->error.velocity[j] = velocityError;
+
             // Update performance statistics
-            double e = this->_feedback->error.position[j];                                          // Makes the code a little easier to work with
-            
-            this->_errorStatistics[j].mean = ((n-1)*this->_errorStatistics[j].mean + e)/n;          
-            this->_errorStatistics[j].min = std::min(this->_errorStatistics[j].min, e);
-            this->_errorStatistics[j].max = std::max(this->_errorStatistics[j].max, e);
+            auto &stats = _errorStatistics[j];
+            stats.min = std::min(stats.min, positionError);
+            stats.max = std::max(stats.max, positionError);
 
-            if(n > 1)
+            if (n > 1)
             {
-                this->_errorStatistics[j].variance = ((n-2)*this->_errorStatistics[j].variance
-                                                   + (n/(n-1))*pow((this->_errorStatistics[j].mean - e),2))/(n-1);
-            }            
-            
-            n++;                                                                                    // Increment counter
+                stats.mean = ((n - 1) * stats.mean + positionError) / n;
+                double delta = positionError - stats.mean;
+                stats.variance = ((n - 2) * stats.variance + (n / (n - 1)) * delta * delta) / (n - 1);
+            }
         }
-        
-        actionManager->publish_feedback(this->_feedback);                                           // As it says
-        
-        loopRate.sleep();                                                                           // Synchronize
-        
-    }while(rclcpp::ok() and elapsedTime < request->points.back().time);                             // NOTE: Using do/while can fail with the timer here?
-        
-    // Send the result to the client
-    if(rclcpp::ok())
-    {
-        result->position_error = this->_errorStatistics;                                            // Transfer data
-        
-        result->successful = 1;
-        result->message = "Trajectory tracking complete.";    
-        
-        RCLCPP_INFO(this->get_logger(), result->message.c_str());
 
-        actionManager->succeed(result);                                                             // Fill in the result message
+        _feedback->time_remaining = _trajectory.end_time() - elapsedTime;
         
+        actionManager->publish_feedback(_feedback);
+
+        loopRate.sleep();                                                                           // Synchronize
+
+        ++n;                                                                                        // Increment counter
+        
+    } while (rclcpp::ok() and elapsedTime <= request->points.back().time);
+
+    // Send the result to the client
+    if (rclcpp::ok())
+    {
+        RCLCPP_INFO(this->get_logger(), "Trajectory tracking complete.");
+
+        result->position_error = _errorStatistics;
+        result->successful = 1;
+
+        actionManager->succeed(result);
+
         RCLCPP_INFO(this->get_logger(), "Awaiting new request.");
+        
+        _mutex->unlock();
     }
 }
+
             
 #endif
