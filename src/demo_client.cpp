@@ -61,7 +61,7 @@ int main(int argc, char **argv)
     
     
     // Get the parameters from the launch file
-    int numJoints = paramNode->declare_parameter<int>("number_of_joints", 6);
+    int numJoints = paramNode->declare_parameter<int>("number_of_joints", 7);
         
     
     // Create the client(s)

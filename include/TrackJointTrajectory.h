@@ -159,7 +159,9 @@ TrackJointTrajectory::request_tracking(const rclcpp_action::GoalUUID &uuid,
             RCLCPP_WARN(this->get_logger(),
                         "Request rejected. Dimensions of trajectory point (%zu) do not match number of joints in model (%u).",
                         point.position.size(), _numJoints);
-                        
+            
+            _mutex->unlock();
+            
             return rclcpp_action::GoalResponse::REJECT;
         }
 
@@ -177,6 +179,8 @@ TrackJointTrajectory::request_tracking(const rclcpp_action::GoalUUID &uuid,
     catch (const std::exception &exception)
     {
         RCLCPP_ERROR(this->get_logger(), "Trajectory creation failed: %s", exception.what());
+        
+        _mutex->unlock();
         
         return rclcpp_action::GoalResponse::REJECT;
     }
