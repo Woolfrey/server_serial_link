@@ -5,9 +5,11 @@
  * @brief  This is for testing action servers.
  */
 
-#include <TrackJointTrajectory.h>                                                                   // ROS2 action
 #include <RobotLibrary/SerialKinematicControl.h>                                                    // For serial link robots
 #include <ModelUpdater.h>                                                                           // Joint state subscriber
+#include <TrackJointTrajectory.h>
+
+using TrackJointTrajectoryAction = serial_link_action_server::action::TrackJointTrajectory;
 
 int main(int argc, char **argv)
 {

@@ -1,8 +1,10 @@
 #include <random>                                                                                   // For generating random numbers
+#include "rclcpp/rclcpp.hpp"
+#include "rclcpp_action/rclcpp_action.hpp"
 #include <thread>                                                                                   // Threading (duh!)
-#include <TrackJointTrajectory.h>                                                                   // ROS2 Action
+#include "serial_link_action_server/action/track_joint_trajectory.hpp"
 
-using JointControlAction = serial_link_interfaces::action::TrackJointTrajectory;                    // Makes referencing easier
+using TrackJointTrajectory = serial_link_action_server::action::TrackJointTrajectory;
 
 // Function template remains the same
 template <typename Action>
@@ -59,11 +61,11 @@ int main(int argc, char **argv)
     
     
     // Get the parameters from the launch file
-    int numJoints = paramNode->declare_parameter<int>("number_of_joints", 7);
+    int numJoints = paramNode->declare_parameter<int>("number_of_joints", 6);
         
     
     // Create the client(s)
-    auto jointControlClient = rclcpp_action::create_client<JointControlAction>(clientNode, "track_joint_trajectory");
+    auto jointControlClient = rclcpp_action::create_client<TrackJointTrajectory>(clientNode, "track_joint_trajectory");
     
     // Wait for server(s) to be advertised
     RCLCPP_INFO(clientNode->get_logger(), "Waiting for action(s) to be advertised...");
@@ -98,7 +100,7 @@ int main(int argc, char **argv)
         else if (commandPrompt == "home" || commandPrompt == "random")
         {
             // Prepare the goal based on the command
-            serial_link_interfaces::msg::JointTrajectoryPoint endPoint;
+            serial_link_action_server::msg::JointTrajectoryPoint endPoint;
             endPoint.time = 5.0;
 
             if (commandPrompt == "home")
@@ -127,7 +129,7 @@ int main(int argc, char **argv)
                 }
             }
 
-            auto goal = std::make_shared<JointControlAction::Goal>();
+            auto goal = std::make_shared<TrackJointTrajectory::Goal>();
             goal->points = {endPoint};
             goal->delay = 0.0;
 
@@ -140,7 +142,7 @@ int main(int argc, char **argv)
             actionThread = std::make_shared<std::thread>(
                 [jointControlClient, goal, clientNode]()
                 {
-                    request_action<JointControlAction>(jointControlClient, goal, clientNode);
+                    request_action<TrackJointTrajectory>(jointControlClient, goal, clientNode);
                 });
 
             if (actionThread && actionThread->joinable())

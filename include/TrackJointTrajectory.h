@@ -14,12 +14,13 @@
 #include <rclcpp_action/rclcpp_action.hpp>                                                          // ROS2 Action C++ libraries
 #include <RobotLibrary/SerialKinematicControl.h>
 #include <RobotLibrary/SplineTrajectory.h>
-#include <serial_link_interfaces/action/track_joint_trajectory.hpp>                                 // Previously built package
+#include "serial_link_action_server/action/track_joint_trajectory.hpp"
+
 #include <std_msgs/msg/float64_multi_array.hpp>
 
 // Short naming conventions for easier referencing
-using JointControlAction = serial_link_interfaces::action::TrackJointTrajectory;
-using JointControlManager = rclcpp_action::ServerGoalHandle<JointControlAction>;
+using JointTrajectoryAction = serial_link_action_server::action::TrackJointTrajectory;
+using JointControlManager = rclcpp_action::ServerGoalHandle<serial_link_action_server::action::TrackJointTrajectory>;
 
 /**
  * This class performs joint trajectory tracking for a serial link robot arm.
@@ -39,15 +40,15 @@ class TrackJointTrajectory : public rclcpp::Node
     
     private:
         
-        std::mutex *_mutex;
+        std::mutex *_mutex;                                                                         ///< Blocks other actions from controlling same robot
         
         unsigned int _numJoints;                                                                    ///< Number of joints being controlled
             
-        rclcpp_action::Server<JointControlAction>::SharedPtr _actionServer;                         ///< This is the foundation for the class.
+        rclcpp_action::Server<JointTrajectoryAction>::SharedPtr _actionServer;                      ///< This is the foundation for the class.
         
-        std::shared_ptr<JointControlAction::Feedback> _feedback = std::make_shared<JointControlAction::Feedback>(); ///< Use this to store feedback
+        std::shared_ptr<JointTrajectoryAction::Feedback> _feedback = std::make_shared<JointTrajectoryAction::Feedback>(); ///< Use this to store feedback
         
-        std::vector<serial_link_interfaces::msg::Statistics> _errorStatistics;                      ///< Stored data on position tracking error
+        std::vector<serial_link_action_server::msg::Statistics> _errorStatistics;                   ///< Stored data on position tracking error
         
         SerialKinematicControl* _controller;                                                        ///< Pointer to the controller
         
@@ -64,7 +65,7 @@ class TrackJointTrajectory : public rclcpp::Node
         inline
         rclcpp_action::GoalResponse
         request_tracking(const rclcpp_action::GoalUUID &uuid,
-                         std::shared_ptr<const JointControlAction::Goal> request);
+                         std::shared_ptr<const JointTrajectoryAction::Goal> request);
         
         /**
          * Processes the cancel request.
@@ -98,7 +99,7 @@ TrackJointTrajectory::TrackJointTrajectory(SerialKinematicControl *controller,
 {
     using namespace std::placeholders;
 
-    _actionServer = rclcpp_action::create_server<JointControlAction>
+    _actionServer = rclcpp_action::create_server<JointTrajectoryAction>
     (this, "track_joint_trajectory",
      std::bind(&TrackJointTrajectory::request_tracking, this, _1, _2),
      std::bind(&TrackJointTrajectory::cancel, this, _1),
@@ -131,7 +132,7 @@ TrackJointTrajectory::TrackJointTrajectory(SerialKinematicControl *controller,
 inline
 rclcpp_action::GoalResponse
 TrackJointTrajectory::request_tracking(const rclcpp_action::GoalUUID &uuid,
-                                       std::shared_ptr<const JointControlAction::Goal> request)
+                                       std::shared_ptr<const JointTrajectoryAction::Goal> request)
 {
     (void)uuid;                                                                                     // Stops colcon from throwing a warning
 
@@ -193,7 +194,7 @@ TrackJointTrajectory::cancel(const std::shared_ptr<JointControlManager> actionMa
 
     RCLCPP_INFO(this->get_logger(), "Received request to cancel joint trajectory tracking.");
     
-    auto result = std::make_shared<JointControlAction::Result>();                                   // Result portion of the action  
+    auto result = std::make_shared<JointTrajectoryAction::Result>();                                // Result portion of the action  
             
     result->successful = -2;                                                                        // CANCELLED
     
@@ -212,7 +213,7 @@ void
 TrackJointTrajectory::track_joint_trajectory(const std::shared_ptr<JointControlManager> actionManager)
 {
     auto request = actionManager->get_goal();                                                       // Retrieve goal
-    auto result = std::make_shared<JointControlAction::Result>();                                   // Stores the result statistics, message
+    auto result = std::make_shared<JointTrajectoryAction::Result>();                                   // Stores the result statistics, message
     rclcpp::Rate loopRate(_controller->frequency());                                                // This regulates the control frequency
     unsigned long long n = 1;                                                                       // This is used for computing statistics
 
@@ -281,8 +282,8 @@ TrackJointTrajectory::track_joint_trajectory(const std::shared_ptr<JointControlM
             _feedback->desired.acceleration[j] = desiredAcceleration[j];
 
             // Update actual state in feedback
-            _feedback->actual.position[j]      = _controller->model()->joint_positions()[j];
-            _feedback->actual.velocity[j]      = _controller->model()->joint_velocities()[j];
+            _feedback->actual.position[j] = _controller->model()->joint_positions()[j];
+            _feedback->actual.velocity[j] = _controller->model()->joint_velocities()[j];
 
             // Compute and update error
             double positionError = _feedback->desired.position[j] - _feedback->actual.position[j];
@@ -329,6 +330,5 @@ TrackJointTrajectory::track_joint_trajectory(const std::shared_ptr<JointControlM
         _mutex->unlock();
     }
 }
-
             
 #endif
