@@ -15,17 +15,19 @@ int main(int argc, char **argv)
 {
     rclcpp::init(argc, argv);                                                                       // Launches ROS2
     
-    auto node = std::make_shared<rclcpp::Node>("serial_link_control_parameters");                   // Create a node to access parameters
+    // Load parameters
+    auto paramNode = std::make_shared<rclcpp::Node>("control_parameters");
 
-    // Load simulation parameters from the server
-    std::string urdfLocation = node->declare_parameter<std::string>("urdf_location", "");
-    std::string endpointName = node->declare_parameter<std::string>("endpoint_name", "unnamed");
+    double kp = paramNode->declare_parameter<double>("kp", 10.0);
+    std::string urdfLocation = paramNode->declare_parameter<std::string>("urdf_location", "");
+    std::string endpointName = paramNode->declare_parameter<std::string>("endpoint_name", "unnamed");
     
     try
     {
         KinematicTree robotModel(urdfLocation);                                                     // Create model
         
         SerialKinematicControl controller(&robotModel, endpointName);                               // Create controller, attach model
+        controller.set_joint_gains(kp,1.0);                                                         // Second argument is trivial
         
         std::mutex mutex;                                                                           // Blocks 2 actions running simultaneously
         
