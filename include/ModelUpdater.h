@@ -50,7 +50,7 @@ ModelUpdater::ModelUpdater(KinematicTree *model, const std::string &topicName)
                              _model(model),
                              _topicName(topicName)
 {
-    using namespace std::placeholders;                                                      // Used when binding callback function to subscriber
+    using namespace std::placeholders;                                                              // Used when binding callback function to subscriber
     
     _subscription = this->create_subscription<JointState>(this->_topicName, 1, std::bind(&ModelUpdater::update, this, _1));
 
@@ -71,14 +71,16 @@ ModelUpdater::update(const JointState &state)
     if(state.position.size() != _model->number_of_joints()
     or state.velocity.size() != _model->number_of_joints())
     {
-        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000, "Dimensions for joint state does not match number of joints in model.");
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+        "Dimensions for joint state does not match number of joints in model.");
         
         return;
     }
     else if(not this->_model->update_state(Eigen::Map<const Eigen::VectorXd>(state.position.data(), state.position.size()),
                                            Eigen::Map<const Eigen::VectorXd>(state.velocity.data(), state.velocity.size())))
     {
-        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000, "Failed to update robot state.");
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+        "Failed to update robot state.");
         
         return;
     }
