@@ -1,3 +1,10 @@
+/**
+ * @file   demo_client.cpp
+ * @author Jon Woolfrey
+ * @date   June 2024
+ * @brief  This is for testing action servers.
+ */
+
 #include <random>                                                                                   // For generating random numbers
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
