@@ -22,6 +22,7 @@ def generate_launch_description():
             {
                 'urdf_location': '/home/woolfrey/workspace/colcon/src/server_serial_link/test/iiwa14.urdf', # CHANGE THIS
                 'endpoint_name': 'link7'
+                'control_topic_name': 'joint_commands'
             }]
         )
     ])
