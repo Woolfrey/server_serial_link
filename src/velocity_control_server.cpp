@@ -1,5 +1,5 @@
 /**
- * @file   test_server.cpp
+ * @file   velocity_control_server.cpp
  * @author Jon Woolfrey
  * @date   June 2024
  * @brief  This is for testing action servers.
