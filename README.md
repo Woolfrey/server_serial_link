@@ -35,13 +35,8 @@ This ROS2 package provides a set of action servers for controlling serial link r
    - **File:** `velocity_control_server.cpp`
    - **Description:** The main executable for launching the control server, which includes initializing nodes and handling robot control and trajectory tracking.
 
-4. **Demo Client**
-   - **File:** `demo_client.cpp`
-   - **Description:** A client application for testing the action server. It allows sending commands to move the robot to specific positions or random positions.
-
-5. **Launch File**
-   - **File:** `launch/robot_control.launch.py`
-   - **Description:** Launch file for starting the ROS2 nodes and specifying parameters for the control server.
+> [!NOTE]
+> Cartesian control actions, and torque control mode will be implemented in future.
 
 ## Prerequisites
 
