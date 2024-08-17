@@ -21,6 +21,7 @@ int main(int argc, char **argv)
     double kp = paramNode->declare_parameter<double>("kp", 10.0);
     std::string urdfLocation = paramNode->declare_parameter<std::string>("urdf_location", "");
     std::string endpointName = paramNode->declare_parameter<std::string>("endpoint_name", "unnamed");
+    std::string controlTopicName = paramNode->declare_parameter<std::string>("control_topic_name", "joint_commands");
     
     try
     {
@@ -32,13 +33,13 @@ int main(int argc, char **argv)
         std::mutex mutex;                                                                           // Blocks 2 actions running simultaneously
         
         // Create the nodes necessary for coordinating the control server
-        auto actionServer = std::make_shared<TrackJointTrajectory>(&controller, &mutex);            // Runs joint control mode
+        auto actionServer = std::make_shared<TrackJointTrajectory>(&controller, &mutex, controlTopicName); // Runs joint control mode
         auto modelUpdater = std::make_shared<ModelUpdater>(&robotModel);                            // Reads & updates joint state
         
         // Create multi-thread executor and add nodes
         rclcpp::executors::MultiThreadedExecutor executor;
-        executor.add_node(actionServer);
         executor.add_node(modelUpdater);
+        executor.add_node(actionServer);
 
         executor.spin();                                                                            // Runs all the nodes on separate threads
 
