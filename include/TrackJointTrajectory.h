@@ -36,6 +36,7 @@ class TrackJointTrajectory : public rclcpp::Node
          */
         TrackJointTrajectory(SerialLinkBase *controller,
                              std::mutex *mutex,
+                             const std::string &controlTopicName = "joint_commands",
                              const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
     
     private:
@@ -91,6 +92,7 @@ class TrackJointTrajectory : public rclcpp::Node
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 TrackJointTrajectory::TrackJointTrajectory(SerialLinkBase *controller,
                                            std::mutex *mutex,
+                                           const std::string &controlTopicName,
                                            const rclcpp::NodeOptions &options)
                                            : Node(controller->model()->name()+"_joint_tracking_server", options),
                                              _mutex(mutex),
@@ -105,8 +107,10 @@ TrackJointTrajectory::TrackJointTrajectory(SerialLinkBase *controller,
      std::bind(&TrackJointTrajectory::cancel, this, _1),
      std::bind(&TrackJointTrajectory::track_joint_trajectory,this,_1)
     );
+    
+    RCLCPP_INFO(this->get_logger(), "Publishing control output to '%s'.", controlTopicName.c_str());
  
-     _jointControlPublisher = this->create_publisher<std_msgs::msg::Float64MultiArray>("joint_commands", 1); 
+     _jointControlPublisher = this->create_publisher<std_msgs::msg::Float64MultiArray>(controlTopicName, 1); 
      
     // Set the size of arrays based on number of joints in robot model
     
