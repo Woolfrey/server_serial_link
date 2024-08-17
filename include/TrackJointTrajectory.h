@@ -12,7 +12,7 @@
 #include <mutex>
 #include <rclcpp/rclcpp.hpp>                                                                        // ROS2 C++ libraries
 #include <rclcpp_action/rclcpp_action.hpp>                                                          // ROS2 Action C++ libraries
-#include <RobotLibrary/SerialKinematicControl.h>
+#include <RobotLibrary/SerialLinkBase.h>
 #include <RobotLibrary/SplineTrajectory.h>
 #include "serial_link_action_server/action/track_joint_trajectory.hpp"
 
@@ -34,7 +34,7 @@ class TrackJointTrajectory : public rclcpp::Node
          * @param A pointer to a robot arm controller.
          * @param options I have no idea what this does ¯\_(ツ)_/¯
          */
-        TrackJointTrajectory(SerialKinematicControl *controller,
+        TrackJointTrajectory(SerialLinkBase *controller,
                              std::mutex *mutex,
                              const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
     
@@ -50,7 +50,7 @@ class TrackJointTrajectory : public rclcpp::Node
         
         std::vector<serial_link_action_server::msg::Statistics> _errorStatistics;                   ///< Stored data on position tracking error
         
-        SerialKinematicControl* _controller;                                                        ///< Pointer to the controller
+        SerialLinkBase* _controller;                                                        ///< Pointer to the controller
         
         SplineTrajectory _trajectory;                                                               ///< Trajectory object
   
@@ -89,7 +89,7 @@ class TrackJointTrajectory : public rclcpp::Node
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                                            Constructor                                         //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-TrackJointTrajectory::TrackJointTrajectory(SerialKinematicControl *controller,
+TrackJointTrajectory::TrackJointTrajectory(SerialLinkBase *controller,
                                            std::mutex *mutex,
                                            const rclcpp::NodeOptions &options)
                                            : Node(controller->model()->name()+"_joint_tracking_server", options),
