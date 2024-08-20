@@ -19,8 +19,8 @@
 #include <std_msgs/msg/float64_multi_array.hpp>
 
 // Short naming conventions for easier referencing
-using JointTrajectoryAction = serial_link_action_server::action::TrackJointTrajectory;
-using JointControlManager = rclcpp_action::ServerGoalHandle<serial_link_action_server::action::TrackJointTrajectory>;
+using JointTrajectoryAction  = serial_link_action_server::action::TrackJointTrajectory;
+using JointTrajectoryManager = rclcpp_action::ServerGoalHandle<serial_link_action_server::action::TrackJointTrajectory>;
 
 /**
  * This class performs joint trajectory tracking for a serial link robot arm.
@@ -51,7 +51,7 @@ class TrackJointTrajectory : public rclcpp::Node
         
         std::vector<serial_link_action_server::msg::Statistics> _errorStatistics;                   ///< Stored data on position tracking error
         
-        SerialLinkBase* _controller;                                                        ///< Pointer to the controller
+        SerialLinkBase* _controller;                                                                ///< Pointer to the controller
         
         SplineTrajectory _trajectory;                                                               ///< Trajectory object
   
@@ -75,7 +75,7 @@ class TrackJointTrajectory : public rclcpp::Node
          */
         inline
         rclcpp_action::CancelResponse
-        cancel(const std::shared_ptr<JointControlManager> actionManager);
+        cancel(const std::shared_ptr<JointTrajectoryManager> actionManager);
         
         /**
          * This is the main control loop for joint trajectory tracking.
@@ -83,7 +83,7 @@ class TrackJointTrajectory : public rclcpp::Node
          */
         inline
         void
-        track_joint_trajectory(const std::shared_ptr<JointControlManager> actionManager);
+        track_joint_trajectory(const std::shared_ptr<JointTrajectoryManager> actionManager);
         
 };                                                                                                  // Semicolon required after a class declaration
 
@@ -197,7 +197,7 @@ TrackJointTrajectory::request_tracking(const rclcpp_action::GoalUUID &uuid,
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 inline
 rclcpp_action::CancelResponse
-TrackJointTrajectory::cancel(const std::shared_ptr<JointControlManager> actionManager)
+TrackJointTrajectory::cancel(const std::shared_ptr<JointTrajectoryManager> actionManager)
 {   
 
     RCLCPP_INFO(this->get_logger(), "Received request to cancel joint trajectory tracking.");
@@ -218,7 +218,7 @@ TrackJointTrajectory::cancel(const std::shared_ptr<JointControlManager> actionMa
 ////////////////////////////////////////////////////////////////////////////////////////////////////       
 inline
 void
-TrackJointTrajectory::track_joint_trajectory(const std::shared_ptr<JointControlManager> actionManager)
+TrackJointTrajectory::track_joint_trajectory(const std::shared_ptr<JointTrajectoryManager> actionManager)
 {
     auto request = actionManager->get_goal();                                                       // Retrieve goal
     auto result = std::make_shared<JointTrajectoryAction::Result>();                                   // Stores the result statistics, message
