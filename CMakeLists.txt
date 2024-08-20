@@ -9,14 +9,15 @@ endif()
 #                                         DEPENDENCIES                                             #
 ####################################################################################################
 
+find_package(Eigen3 REQUIRED)
 find_package(ament_cmake REQUIRED)
+find_package(geometry_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(RobotLibrary REQUIRED)
-find_package(Eigen3 REQUIRED)
 
 include_directories(${EIGEN3_INCLUDE_DIRS})
 include_directories(include)
@@ -27,11 +28,14 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/rosidl_generator_cpp)  # Ensure 
 ####################################################################################################
 
 rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/CartesianState.msg"
+  "msg/CartesianTrajectoryPoint.msg"
   "msg/JointState.msg"
   "msg/JointTrajectoryPoint.msg"
   "msg/Statistics.msg"
   "action/TrackJointTrajectory.action"
-  DEPENDENCIES builtin_interfaces std_msgs sensor_msgs
+  "action/TrackCartesianTrajectory.action"
+  DEPENDENCIES builtin_interfaces geometry_msgs std_msgs sensor_msgs
 )
 
 ########################################### Server #################################################

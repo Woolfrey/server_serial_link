@@ -7,6 +7,7 @@
 
 #include <RobotLibrary/SerialKinematicControl.h>                                                    // For serial link robots
 #include <ModelUpdater.h>                                                                           // Joint state subscriber
+#include <TrackCartesianTrajectory.h>
 #include <TrackJointTrajectory.h>
 
 using TrackJointTrajectoryAction = serial_link_action_server::action::TrackJointTrajectory;
@@ -33,13 +34,15 @@ int main(int argc, char **argv)
         std::mutex mutex;                                                                           // Blocks 2 actions running simultaneously
         
         // Create the nodes necessary for coordinating the control server
-        auto actionServer = std::make_shared<TrackJointTrajectory>(&controller, &mutex, controlTopicName); // Runs joint control mode
+        auto jointTrajectoryServer = std::make_shared<TrackJointTrajectory>(&controller, &mutex, controlTopicName); // Runs joint control mode
+        auto cartesianTrajectoryServer = std::make_shared<TrackCartesianTrajectory>(&controller, &mutex, controlTopicName); // Runs Cartesian control mode
         auto modelUpdater = std::make_shared<ModelUpdater>(&robotModel);                            // Reads & updates joint state
         
         // Create multi-thread executor and add nodes
         rclcpp::executors::MultiThreadedExecutor executor;
         executor.add_node(modelUpdater);
-        executor.add_node(actionServer);
+        executor.add_node(jointTrajectoryServer);
+        executor.add_node(cartesianTrajectoryServer);
 
         executor.spin();                                                                            // Runs all the nodes on separate threads
 
