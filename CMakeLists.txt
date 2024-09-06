@@ -5,11 +5,7 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-####################################################################################################
-#                                         DEPENDENCIES                                             #
-####################################################################################################
-
-find_package(Eigen3 REQUIRED)
+# ROS2 dependencies
 find_package(ament_cmake REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -17,16 +13,17 @@ find_package(rclcpp_action REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
+
+# Other dependencies
+find_package(Eigen3 REQUIRED)
 find_package(RobotLibrary REQUIRED)
 
 include_directories(${EIGEN3_INCLUDE_DIRS})
 include_directories(include)
-include_directories(${CMAKE_CURRENT_BINARY_DIR}/rosidl_generator_cpp)  # Ensure generated headers are included
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/rosidl_generator_cpp)
+include_directories(${CMAKE_BINARY_DIR}/rosidl_generator_cpp)  # Ensure generated headers are included
 
-####################################################################################################
-#                                  MESSAGE & ACTION DEFINITIONS                                    #
-####################################################################################################
-
+# Message & Action Definitions
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/CartesianState.msg"
   "msg/CartesianTrajectoryPoint.msg"
@@ -38,7 +35,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   DEPENDENCIES builtin_interfaces geometry_msgs std_msgs sensor_msgs
 )
 
-########################################### Server #################################################
+# Velocity control server
 add_executable(velocity_control_server src/velocity_control_server.cpp)
 
 ament_target_dependencies(velocity_control_server
@@ -56,7 +53,9 @@ target_link_libraries(velocity_control_server
   RobotLibrary::RobotLibrary
 )
 
-######################################## Client ####################################################
+rosidl_target_interfaces(velocity_control_server ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
+# Demo client
 add_executable(demo_client src/demo_client.cpp)
 
 ament_target_dependencies(demo_client
@@ -73,7 +72,9 @@ target_link_libraries(demo_client
   RobotLibrary::RobotLibrary
 )
 
-# Installation directives
+rosidl_target_interfaces(demo_client ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
+# Installation
 install(TARGETS
   velocity_control_server
   demo_client
