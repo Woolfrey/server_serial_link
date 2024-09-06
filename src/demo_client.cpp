@@ -1,10 +1,13 @@
 #include <random>                                                                                   // For generating random numbers
-#include "rclcpp/rclcpp.hpp"
-#include "rclcpp_action/rclcpp_action.hpp"
+#include "rclcpp/rclcpp.hpp"                                                                        // ROS2 C++ library
+#include "rclcpp_action/rclcpp_action.hpp"                                                          // ROS2 C++ action library
 #include <thread>                                                                                   // Threading (duh!)
-#include "serial_link_action_server/action/track_joint_trajectory.hpp"
+#include "serial_link_action_server/action/track_joint_trajectory.hpp"                              // Custom action
+#include "serial_link_action_server/action/track_cartesian_trajectory.hpp"
+#include "serial_link_action_server/msg/cartesian_trajectory_point.hpp"
 
 using TrackJointTrajectory = serial_link_action_server::action::TrackJointTrajectory;
+using TrackCartesianTrajectory = serial_link_action_server::action::TrackCartesianTrajectory;
 
 /**
  * This function manages goal execution in its own thread so the client can manage other things.
@@ -24,77 +27,77 @@ execute_action(std::shared_ptr<rclcpp_action::Client<Action>> client,
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char **argv)
 {
-    if(argc != 2)
+    // Ensure exactly 2 arguments are provided (executable and number of joints)
+    if (argc != 2)
     {
-        std::cerr << "[ERROR] [DEMO CLIENT] Use:\n"
+        std::cerr << "[ERROR] [DEMO CLIENT] Usage:\n"
                   << "ros2 run serial_link_action_server demo_client numberOfJoints\n";
-        
-        return 0;
+        return 1;                                                                                   // Exit with error
     }
-    
-    rclcpp::init(argc, argv);                                                                       // Start up ROS2
-    
+
+    // Initialize ROS2
+    rclcpp::init(argc, argv);
     int numJoints = std::stoi(argv[1]);
-    
-    // Create the client
-    auto clientNode = rclcpp::Node::make_shared("serial_link_demo_client");                         // Used to regulate actions
+
+    auto clientNode = rclcpp::Node::make_shared("serial_link_demo_client");                         // Create a ROS2 node
+
+    // Create action clients for joint and cartesian trajectories
     auto jointTrajectoryClient = rclcpp_action::create_client<TrackJointTrajectory>(
         clientNode, "track_joint_trajectory");
-        
-    // Wait for server(s) to be advertised
-    RCLCPP_INFO(clientNode->get_logger(), "Waiting for action(s) to be advertised...");
-    
-    if(not jointTrajectoryClient->wait_for_action_server(std::chrono::seconds(5)))
+    auto cartesianTrajectoryClient = rclcpp_action::create_client<TrackCartesianTrajectory>(
+        clientNode, "track_cartesian_trajectory");
+
+    // Wait for servers to be advertised
+    RCLCPP_INFO(clientNode->get_logger(), "Waiting for action servers to be advertised...");
+    if (!jointTrajectoryClient->wait_for_action_server(std::chrono::seconds(5)) &&
+        !cartesianTrajectoryClient->wait_for_action_server(std::chrono::seconds(5)))
     {
         RCLCPP_ERROR(clientNode->get_logger(),
-                    "Action server(s) did not appear after waiting for 5 seconds. Shutting down.");
-        
+                     "Action servers did not appear after 5 seconds. Shutting down.");
         rclcpp::shutdown();
-        
-        return 0;
+        return 1;                                                                                   // Exit with error
     }
-    
-    // Run loop
-    bool clientActive = true;                                                                       // Switch for the loop below                                                                                 
-    std::shared_ptr<std::thread> actionThread = nullptr;                                            // Pointer to manage the thread
-    
-    do
+
+    bool clientActive = true;  // Main loop control flag
+    std::shared_ptr<std::thread> actionThread = nullptr;                                            // Thread for asynchronous execution
+
+    while (clientActive && rclcpp::ok())
     {
-        RCLCPP_INFO(clientNode->get_logger(), "Enter command (close, home, random):");              // Inform user
+        RCLCPP_INFO(clientNode->get_logger(),
+                    "Enter command (close, home, random, up, down, left, right, fore, aft):");
 
+        // Get user input
         std::string commandPrompt;
-        std::getline(std::cin, commandPrompt);                                                      // Get input from user
+        std::getline(std::cin, commandPrompt);
 
+        // Handle "close" command to shut down the client
         if (commandPrompt == "close")
         {
             RCLCPP_INFO(clientNode->get_logger(), "Shutting down.");
-            clientActive = false;                                                                   // This will break the loop
+            clientActive = false;
         }
+        // Handle joint trajectory commands ("home" or "random")
         else if (commandPrompt == "home" or commandPrompt == "random")
         {
-            // Set the trajectory points
             serial_link_action_server::msg::JointTrajectoryPoint endPoint;
-            endPoint.time = 5.0;
+            endPoint.time = 5.0;  // Set movement time
 
+            // Populate joint positions
             if (commandPrompt == "home")
             {
                 RCLCPP_INFO(clientNode->get_logger(), "Moving to home position.");
-
-                for (int i = 0; i < numJoints; i++)
-                {
-                    endPoint.position.push_back(0.0);
-                    endPoint.velocity.push_back(0.0);
-                    endPoint.acceleration.push_back(0.0);
-                }
+                endPoint.position.assign(numJoints, 0.0);                                           // All joints to 0
+                endPoint.velocity.assign(numJoints, 0.0);
+                endPoint.acceleration.assign(numJoints, 0.0);
             }
             else if (commandPrompt == "random")
             {
-                RCLCPP_INFO(clientNode->get_logger(), "Moving to random position.");
-
+                RCLCPP_INFO(clientNode->get_logger(), "Moving to random joint position.");
                 std::uniform_real_distribution<double> uniformDistribution(-2.0, 2.0);
                 std::default_random_engine randomEngine(static_cast<unsigned>(std::time(0)));
 
-                for (int i = 0; i < numJoints; i++)
+                // Assign random positions
+                for (int i = 0; i < numJoints; ++i)
                 {
                     endPoint.position.push_back(uniformDistribution(randomEngine));
                     endPoint.velocity.push_back(0.0);
@@ -102,40 +105,78 @@ int main(int argc, char **argv)
                 }
             }
 
-            // Concatenate trajectory points and attach to goal message
+            // Create goal and attach trajectory points
             auto goal = std::make_shared<TrackJointTrajectory::Goal>();
             goal->points = {endPoint};
             goal->delay = 0.0;
 
+            // Join any previous thread to avoid conflicts
             if (actionThread && actionThread->joinable())
             {
-                actionThread->join();                                                               // Wait for the previous thread to finish
+                actionThread->join();
             }
 
-            // Start a new thread
+            // Start a new action thread
             actionThread = std::make_shared<std::thread>(
                 [jointTrajectoryClient, goal, clientNode]()
                 {
                     execute_action<TrackJointTrajectory>(jointTrajectoryClient, goal, clientNode);
                 });
         }
+        // Handle cartesian trajectory commands
+        else if (commandPrompt == "left" or commandPrompt == "right" or
+                 commandPrompt == "up"   or commandPrompt == "down"  or
+                 commandPrompt == "fore" or commandPrompt == "aft")
+        {
+            RCLCPP_INFO(clientNode->get_logger(), "Moving endpoint %s.", commandPrompt.c_str());
+
+            // Set up cartesian trajectory point
+            serial_link_action_server::msg::CartesianTrajectoryPoint endPoint;
+            endPoint.time = 2.0;
+            endPoint.reference = 2;  // Relative to endpoint frame
+
+            // Update endpoint position based on the command
+            if (commandPrompt == "left")       endPoint.pose.position.y =  0.2;
+            else if (commandPrompt == "right") endPoint.pose.position.y = -0.2;
+            else if (commandPrompt == "up")    endPoint.pose.position.z =  0.2;
+            else if (commandPrompt == "down")  endPoint.pose.position.z = -0.2;
+            else if (commandPrompt == "fore")  endPoint.pose.position.x =  0.2;
+            else if (commandPrompt == "aft")   endPoint.pose.position.x = -0.2;
+
+            endPoint.pose.orientation.w = 1.0;  // No orientation change
+
+            // Create goal and attach cartesian point
+            auto goal = std::make_shared<TrackCartesianTrajectory::Goal>();
+            goal->points = {endPoint};
+            goal->delay = 0.0;
+
+            // Join any previous thread to avoid conflicts
+            if (actionThread && actionThread->joinable())
+            {
+                actionThread->join();
+            }
+
+            // Start a new action thread
+            actionThread = std::make_shared<std::thread>(
+                [cartesianTrajectoryClient, goal, clientNode]()
+                {
+                    execute_action<TrackCartesianTrajectory>(cartesianTrajectoryClient, goal, clientNode);
+                });
+        }
         else
         {
             RCLCPP_INFO(clientNode->get_logger(), "Unknown command. Please try again.");
         }
-
-    } while (clientActive and rclcpp::ok());
-
-
-    // Cleanup
-    if (actionThread and actionThread->joinable())
-    {
-        actionThread->join();                                                                       // Wait for the last thread to finish
     }
 
-    rclcpp::shutdown();                                                                             // Shut down ROS2
-    
-    return 0;                                                                                       // Exit with no errors
+    // Cleanup before exiting
+    if (actionThread && actionThread->joinable())
+    {
+        actionThread->join();                                                                       // Ensure the last thread finishes before shutdown
+    }
+
+    rclcpp::shutdown();                                                                             // Shutdown ROS2
+    return 0;
 }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
