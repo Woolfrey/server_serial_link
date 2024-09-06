@@ -24,6 +24,6 @@ def generate_launch_description():
                     'endpoint_name': 'link7',
                     'control_topic_name': 'joint_commands'
                 }
-                ]
+            ]
         )
     ])
