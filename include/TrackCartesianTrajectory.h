@@ -139,6 +139,8 @@ TrackCartesianTrajectory::request_tracking(const rclcpp_action::GoalUUID &uuid,
         return rclcpp_action::GoalResponse::REJECT;
     }
     
+    RCLCPP_WARN(this->get_logger(), "Request for Cartesian control received.");
+    
     std::vector<double> times(1, 0.0);                                                              // Initialise time vector with start of 0.0s
     
     std::vector<Pose> poses;                                                                        // Poses that make up the trajectory spline
@@ -158,8 +160,22 @@ TrackCartesianTrajectory::request_tracking(const rclcpp_action::GoalUUID &uuid,
                                          point.pose.orientation.x,
                                          point.pose.orientation.y,
                                          point.pose.orientation.z};
-       
-       poses.emplace_back(Pose(translation,quaternion));
+                                         
+       if(point.reference == 0)                                                                     // Pose is in the global / base frame
+       {
+            poses.emplace_back(Pose(translation,quaternion));
+       }
+       else if(point.reference == 1)                                                                // Pose is in the endpoint frame
+       {
+            poses.emplace_back(poses.back()*Pose(translation, quaternion));
+       }
+       else if(point.reference == 2)                                                                // Pose is relative to endpoint frame, but in base frame coordinates
+       {
+            translation = poses.back().translation() + translation;                                 // Add the translation
+            quaternion  = poses.back().quaternion()*quaternion;                                     // Add the rotation
+            
+            poses.emplace_back(Pose(translation,quaternion));
+       }
    }
    
    // Try to create the trajectory
@@ -175,7 +191,7 @@ TrackCartesianTrajectory::request_tracking(const rclcpp_action::GoalUUID &uuid,
         
         return rclcpp_action::GoalResponse::REJECT;
     }
-    
+   
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;                                         // Return success and continue to execution
 }
 
