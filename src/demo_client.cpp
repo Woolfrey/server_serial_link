@@ -1,3 +1,10 @@
+/**
+ * @file   demo_client.cpp
+ * @author Jon Woolfrey
+ * @date   August 2024
+ * @brief  This is for testing action servers.
+ */
+
 #include <random>                                                                                   // For generating random numbers
 #include "rclcpp/rclcpp.hpp"                                                                        // ROS2 C++ library
 #include "rclcpp_action/rclcpp_action.hpp"                                                          // ROS2 C++ action library
