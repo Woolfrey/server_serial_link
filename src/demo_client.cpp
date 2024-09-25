@@ -27,19 +27,16 @@ execute_action(std::shared_ptr<rclcpp_action::Client<Action>> client,
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char **argv)
 {
-    // Ensure exactly 2 arguments are provided (executable and number of joints)
-    if (argc != 2)
+    rclcpp::init(argc, argv);  // Initialize ROS2
+
+    auto clientNode = rclcpp::Node::make_shared("serial_link_demo_client");
+
+    if(argc != 2)
     {
-        std::cerr << "[ERROR] [DEMO CLIENT] Usage:\n"
-                  << "ros2 run serial_link_action_server demo_client numberOfJoints\n";
-        return 1;                                                                                   // Exit with error
+        throw std::invalid_argument("Require number of joints as input.");
     }
-
-    // Initialize ROS2
-    rclcpp::init(argc, argv);
+    
     int numJoints = std::stoi(argv[1]);
-
-    auto clientNode = rclcpp::Node::make_shared("serial_link_demo_client");                         // Create a ROS2 node
 
     // Create action clients for joint and cartesian trajectories
     auto jointTrajectoryClient = rclcpp_action::create_client<TrackJointTrajectory>(
@@ -59,7 +56,8 @@ int main(int argc, char **argv)
     }
 
     bool clientActive = true;  // Main loop control flag
-    std::shared_ptr<std::thread> actionThread = nullptr;                                            // Thread for asynchronous execution
+    
+        std::shared_ptr<std::thread> actionThread = nullptr;                                            // Thread for asynchronous execution
 
     while (clientActive && rclcpp::ok())
     {

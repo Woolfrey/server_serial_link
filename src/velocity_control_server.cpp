@@ -29,6 +29,7 @@ int main(int argc, char **argv)
         KinematicTree robotModel(urdfLocation);                                                     // Create model
         
         SerialKinematicControl controller(&robotModel, endpointName);                               // Create controller, attach model
+        
         controller.set_joint_gains(kp,1.0);                                                         // Second argument is trivial
         
         std::mutex mutex;                                                                           // Blocks 2 actions running simultaneously
