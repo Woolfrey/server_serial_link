@@ -55,6 +55,26 @@ target_link_libraries(velocity_control_server
 
 rosidl_target_interfaces(velocity_control_server ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
+# Torque control server
+add_executable(torque_control_server src/torque_control_server.cpp)
+
+ament_target_dependencies(torque_control_server
+  "ament_cmake"
+  "rclcpp"
+  "rclcpp_action"
+  "rosidl_default_runtime"
+  "sensor_msgs"
+  "std_msgs"
+)
+
+target_link_libraries(torque_control_server
+  ${PROJECT_NAME}__rosidl_typesupport_cpp  # Link the generated action typesupport
+  Eigen3::Eigen
+  RobotLibrary::RobotLibrary
+)
+
+rosidl_target_interfaces(torque_control_server ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
 # Demo client
 add_executable(demo_client src/demo_client.cpp)
 
@@ -77,6 +97,7 @@ rosidl_target_interfaces(demo_client ${PROJECT_NAME} "rosidl_typesupport_cpp")
 # Installation
 install(TARGETS
   velocity_control_server
+  torque_control_server
   demo_client
   DESTINATION lib/${PROJECT_NAME}
 )
