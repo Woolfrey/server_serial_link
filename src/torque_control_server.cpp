@@ -19,8 +19,9 @@ int main(int argc, char **argv)
     // Load parameters
     auto paramNode = std::make_shared<rclcpp::Node>("control_parameters");
 
-    double kp = paramNode->declare_parameter<double>("kp", 500.0);
-    double kd = paramNode->declare_parameter<double>("kds", 50.0);
+    double kp = paramNode->declare_parameter<double>("kp", 10.0);
+    double kd = paramNode->declare_parameter<double>("kd",  5.0);
+    
     std::string urdfLocation = paramNode->declare_parameter<std::string>("urdf_location", "");
     std::string endpointName = paramNode->declare_parameter<std::string>("endpoint_name", "unnamed");
     std::string controlTopicName = paramNode->declare_parameter<std::string>("control_topic_name", "joint_commands");
