@@ -12,18 +12,18 @@ def generate_launch_description():
     control_params = os.path.join(config_dir, 'mujoco_torque_control.yaml')
 
     # Define LaunchConfigurations for parameters with default values
-    urdf_location = LaunchConfiguration('urdf_location', default='/home/woolfrey/workspace/colcon/src/server_serial_link/test/iiwa14.urdf')
+    urdf_location = os.path.join(get_package_share_directory('serial_link_action_server'), 'test', 'iiwa14.urdf')
     endpoint_name = LaunchConfiguration('endpoint_name', default='link7')
 
     return LaunchDescription([
         # Declare launch arguments
-        DeclareLaunchArgument('urdf_location', default_value='/home/woolfrey/workspace/colcon/src/server_serial_link/test/iiwa14.urdf', description='Path to the URDF file'),
+        DeclareLaunchArgument('urdf_location', default_value=urdf_location, description='Path to the URDF file'),
         DeclareLaunchArgument('endpoint_name', default_value='link7', description='Name of the endpoint'),
 
         # Node configuration
         Node(
             package='serial_link_action_server',
-            executable='velocity_control_server',
+            executable='torque_control_server',
             output='screen',
             parameters=[
                 control_params,
@@ -35,3 +35,4 @@ def generate_launch_description():
             ]
         )
     ])
+
