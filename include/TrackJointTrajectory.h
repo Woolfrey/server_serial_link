@@ -264,22 +264,22 @@ TrackJointTrajectory::track_joint_trajectory(const std::shared_ptr<JointTrajecto
     
     do
     {
-        _controller->update();
+        _controller->update();                                                                      // Re-computes forward kinematics & inverse dynamics
         
-        elapsedTime = timer.now().seconds() - startTime;
+        elapsedTime = timer.now().seconds() - startTime;                                            // As it says
         
         const auto &[desiredPosition,
                      desiredVelocity,
-                     desiredAcceleration] = _trajectory.query_state(elapsedTime);
+                     desiredAcceleration] = _trajectory.query_state(elapsedTime);                   // Query the trajectory for the current time
 
         Eigen::VectorXd control = _controller->track_joint_trajectory(desiredPosition,
                                                                       desiredVelocity,
-                                                                      desiredAcceleration);
+                                                                      desiredAcceleration);         // Solve the feedforward/feedback control
         
-        std_msgs::msg::Float64MultiArray msg;   
+        std_msgs::msg::Float64MultiArray msg;
         msg.data = {control.data(), control.data() + control.size()};
         
-        _jointControlPublisher->publish(msg);
+        _jointControlPublisher->publish(msg);                                                       // Publish control topic
 
         // Update feedback and error statistics
         for (unsigned int j = 0; j < _numJoints; ++j)
@@ -313,16 +313,18 @@ TrackJointTrajectory::track_joint_trajectory(const std::shared_ptr<JointTrajecto
             }
         }
 
-        _feedback->time_remaining = _trajectory.end_time() - elapsedTime;
+        _feedback->time_remaining = _trajectory.end_time() - elapsedTime;                           // As it says
         
-        actionManager->publish_feedback(_feedback);
+        actionManager->publish_feedback(_feedback);                                                 // Make feedback available on ROS2 network
 
         loopRate.sleep();                                                                           // Synchronize
 
-        ++n;                                                                                        // Increment counter
+        ++n;                                                                                        // Increment counter for statistics
         
     } while (rclcpp::ok() and elapsedTime <= request->points.back().time);
 
+    _controller->clear_last_solution();                                                             // Clear the last solution in the QP solver
+    
     // Send the result to the client
     if (rclcpp::ok())
     {
