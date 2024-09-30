@@ -331,8 +331,8 @@ TrackCartesianTrajectory::track_cartesian_trajectory(const std::shared_ptr<Carte
         
         // Put pose error data in to feedback field
         Eigen::Vector<double,6> error = actualPose.error(desiredPose);
-        _feedback->position_error = error.head(3).norm();
-        _feedback->orientation_error = error.tail(3).norm(); 
+        _feedback->position_error     = error.head(3).norm();
+        _feedback->orientation_error  = error.tail(3).norm(); 
         
         _feedback->time_remaining = _trajectory.end_time() - elapsedTime;                           // As it says
         
