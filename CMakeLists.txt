@@ -25,26 +25,26 @@ include_directories(${CMAKE_BINARY_DIR}/rosidl_generator_cpp)  # Ensure generate
 
 # Message & Action Definitions
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/CartesianState.msg"
-  "msg/CartesianTrajectoryPoint.msg"
-  "msg/JointState.msg"
-  "msg/JointTrajectoryPoint.msg"
-  "msg/Statistics.msg"
-  "action/TrackJointTrajectory.action"
-  "action/TrackCartesianTrajectory.action"
-  DEPENDENCIES builtin_interfaces geometry_msgs std_msgs sensor_msgs
+    "msg/CartesianState.msg"
+    "msg/CartesianTrajectoryPoint.msg"
+    "msg/JointState.msg"
+    "msg/JointTrajectoryPoint.msg"
+    "msg/Statistics.msg"
+    "action/TrackJointTrajectory.action"
+    "action/TrackCartesianTrajectory.action"
+    DEPENDENCIES builtin_interfaces geometry_msgs std_msgs sensor_msgs
 )
 
 # Velocity control server
 add_executable(velocity_control_server src/velocity_control_server.cpp)
 
 ament_target_dependencies(velocity_control_server
-  "ament_cmake"
-  "rclcpp"
-  "rclcpp_action"
-  "rosidl_default_runtime"
-  "sensor_msgs"
-  "std_msgs"
+    "ament_cmake"
+    "rclcpp"
+    "rclcpp_action"
+    "rosidl_default_runtime"
+    "sensor_msgs"
+    "std_msgs"
 )
 
 target_link_libraries(velocity_control_server
@@ -59,12 +59,12 @@ rosidl_target_interfaces(velocity_control_server ${PROJECT_NAME} "rosidl_typesup
 add_executable(torque_control_server src/torque_control_server.cpp)
 
 ament_target_dependencies(torque_control_server
-  "ament_cmake"
-  "rclcpp"
-  "rclcpp_action"
-  "rosidl_default_runtime"
-  "sensor_msgs"
-  "std_msgs"
+    "ament_cmake"
+    "rclcpp"
+    "rclcpp_action"
+    "rosidl_default_runtime"
+    "sensor_msgs"
+    "std_msgs"
 )
 
 target_link_libraries(torque_control_server
@@ -79,11 +79,11 @@ rosidl_target_interfaces(torque_control_server ${PROJECT_NAME} "rosidl_typesuppo
 add_executable(demo_client src/demo_client.cpp)
 
 ament_target_dependencies(demo_client
-  "ament_cmake"
-  "rclcpp"
-  "rclcpp_action"
-  "rosidl_default_runtime"
-  "std_msgs"
+    "ament_cmake"
+    "rclcpp"
+    "rclcpp_action"
+    "rosidl_default_runtime"
+    "std_msgs"
 )
 
 target_link_libraries(demo_client
@@ -105,6 +105,12 @@ install(TARGETS
 install(DIRECTORY launch
   DESTINATION share/${PROJECT_NAME}/launch
 )
+
+install(DIRECTORY config/
+        DESTINATION share/${PROJECT_NAME}/config)
+
+install(DIRECTORY test/
+        DESTINATION share/${PROJECT_NAME}/test)
 
 ament_package()
 
