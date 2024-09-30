@@ -4,8 +4,7 @@
 This ROS2 package provides a set of action servers for controlling serial link robot arms.
 
 > [!NOTE]
-> This package is still under development. <br>
-> More features will be added.
+> This package is still under development. More features will be added.
 
 ## Table of Contents
 
@@ -34,9 +33,13 @@ This ROS2 package provides a set of action servers for controlling serial link r
 3. **Velocity Control Server**
    - **File:** `velocity_control_server.cpp`
    - **Description:** The main executable for launching the control server, which includes initializing nodes and handling robot control and trajectory tracking.
+  
+4. **Torque Control Server**
+   - **File:** `torque_control_server.cpp`
+   - **Description:** Launches a control server, but computes the inverse dynamics necessary to execute control actions, such as joint trajectory tracking, and Cartesian control.
 
-> [!NOTE]
-> Cartesian control actions, and torque control mode will be implemented in future.
+> [!WARNING]
+> The torque control actions are still not fully complete.
 
 ## Prerequisites
 
@@ -79,23 +82,26 @@ You may modify/write your own to work with any robot.
 
 #### Testing the Action Server
 
-Run the mujoco_interface node:
+1. Launch the MuJoCo simulation. There are two options, `velocity_mode.py`, or `torque_mode.py`:
 ```
-ros2 launch mujoco_interface default.py
+ros2 launch mujoco_interface velocity_mode.py
 ```
-Launch the action server:
+2. Launch the action server. It must match the control mode:
+```
+ros2 launch serial_link_action_server mujoco_velocity_control.py
+```
+or `mujoco_torque_control.py` if running torque mode.
 
-```
-ros2 launch serial_link_action_server mujoco_velocity_control.launch.py
-```
-
-Run the client:
+3. Run the client:
 
 ```
 ros2 run serial_link_action_server demo_client <numberOfJoints>
 ```
-
 Replace <numberOfJoints> with the number of joints of the robot.
+
+
+> [!TIP]
+> The client is independent of the control mode! :+1:
 
 ## Contributing
 
