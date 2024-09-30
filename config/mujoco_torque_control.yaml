@@ -1,5 +1,5 @@
 control_parameters: # NOTE: This must match the node name in the cpp file
   ros__parameters:
-    kp: 100.0
-    kd: 1.0
+    kp: 20.0
+    kd: 15.0
     # More to be added later

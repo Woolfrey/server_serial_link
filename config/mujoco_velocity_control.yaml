@@ -1,4 +1,3 @@
-control_parameters: # NOTE: This must match the node name in the cpp file
+control_parameters:                     # NOTE: This must match the node name in the cpp file
   ros__parameters:
-    kp: 100.0
-    # More to be added later
+    kp: 50.0                            # Joint position gain
