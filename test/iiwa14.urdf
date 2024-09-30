@@ -1,4 +1,5 @@
 <?xml version="1.0" ?>
+    <!-- This URDF was generated from an XML file in the MuJoCo Menagerie project. -->
 <robot name="iiwa14">
    <link name="world">
       <inertial>
