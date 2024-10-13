@@ -8,118 +8,82 @@
 #ifndef TRACKCARTESIANTRAJECTORY_H
 #define TRACKCARTESIANTRAJECTORY_H
 
-#include <Eigen/Dense>                                                                              // Can use Eigen::Map?
-#include <mutex>
-#include <rclcpp/rclcpp.hpp>                                                                        // ROS2 C++ libraries
-#include <rclcpp_action/rclcpp_action.hpp>                                                          // ROS2 Action C++ libraries
-#include <RobotLibrary/SerialLinkBase.h>                                                            // Control class
+#include <ActionServerBase.h>
 #include <RobotLibrary/CartesianSpline.h>                                                           // Trajectory generator
 #include "serial_link_action_server/action/track_cartesian_trajectory.hpp"                          // Custom generated action
-#include <std_msgs/msg/float64_multi_array.hpp>
-
-// Short naming conventions for easier referencing
-
-using CartesianTrajectoryAction  = serial_link_action_server::action::TrackCartesianTrajectory;
-using CartesianTrajectoryManager = rclcpp_action::ServerGoalHandle<CartesianTrajectoryAction>;
 
 /**
  * This class performs joint trajectory tracking for a serial link robot arm.
  */
-class TrackCartesianTrajectory : public rclcpp::Node
+class TrackCartesianTrajectory : public ActionServerBase<serial_link_action_server::action::TrackCartesianTrajectory>
 {
     public:
-        
+
+        using Action  = serial_link_action_server::action::TrackCartesianTrajectory;
+        using ActionManager = rclcpp_action::ServerGoalHandle<Action>;
+                
         /**
          * Constructor for the class.
          * @param A pointer to a robot arm controller.
          * @param options I have no idea what this does ¯\_(ツ)_/¯
          */
-        TrackCartesianTrajectory(SerialLinkBase *controller,
+        TrackCartesianTrajectory(std::shared_ptr<rclcpp::Node> node,
+                                 SerialLinkBase *controller,
                                  std::mutex *mutex,
-                                 const std::string &controlTopicName = "joint_commands",
-                                 const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
+                                 const std::string &actionName = "track_joint_trajectory",
+                                 const std::string &controlTopicName = "joint_commands");
     
     private:
-        
-        std::mutex *_mutex;                                                                         ///< Blocks other actions from controlling same robot
-        
-        rclcpp_action::Server<CartesianTrajectoryAction>::SharedPtr _actionServer;                  ///< This is the foundation for the class.
-        
-        std::shared_ptr<CartesianTrajectoryAction::Feedback> _feedback = std::make_shared<CartesianTrajectoryAction::Feedback>(); ///< Use this to store feedback
-       
-        SerialLinkBase* _controller;                                                                ///< Pointer to the controller
-        
+   
         CartesianSpline _trajectory;                                                                ///< Trajectory object
-  
-        rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr _jointControlPublisher;      ///< Joint control topic
 
         /**
-         * Processes the request for the TrackJointTrajectory action.
+         * Processes the request to execute action.
+         * This is a virtual function and must be defined by any derived class.
          * @param uuid I have no idea what this does ¯\_(ツ)_/¯
-         * @param request The goal component of the TrackJointControl action definition.
+         * @param request The goal component of the action definition.
          * @return REJECT if the arguments are not sound, ACCEPT_AND_EXECUTE otherwise.
          */
-        inline
+        virtual
         rclcpp_action::GoalResponse
-        request_tracking(const rclcpp_action::GoalUUID &uuid,
-                         std::shared_ptr<const CartesianTrajectoryAction::Goal> request);
+        request_action(const rclcpp_action::GoalUUID &uuid,
+                       std::shared_ptr<const typename Action::Goal> request);
         
         /**
          * Processes the cancel request.
+         * This is a virtual function and must be defined in any derived class.
          * @param actionManager A pointer to the rclcpp::ServerGoalHandle for this action
          * @return rclcpp_action::CancelResponse::ACCEPT
          */
-        inline
+        virtual
         rclcpp_action::CancelResponse
-        cancel(const std::shared_ptr<CartesianTrajectoryManager> actionManager);
+        cancel(const std::shared_ptr<ActionManager> actionManager);
         
         /**
          * This is the main control loop for joint trajectory tracking.
+         * This is a virtual function and must be defined in any derived class.
          * @param actionManager A pointer to the rclcpp::ServerGoalHandle for this action
          */
-        inline
+        virtual
         void
-        track_cartesian_trajectory(const std::shared_ptr<CartesianTrajectoryManager> actionManager);     
+        execute_action(const std::shared_ptr<ActionManager> actionManager);       
 };                                                                                                  // Semicolon required after a class declaration
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                                         Constructor                                            //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-TrackCartesianTrajectory::TrackCartesianTrajectory(SerialLinkBase *controller,
+TrackCartesianTrajectory::TrackCartesianTrajectory(std::shared_ptr<rclcpp::Node> node,
+                                                   SerialLinkBase *controller,
                                                    std::mutex *mutex,
-                                                   const std::string &controlTopicName,
-                                                   const rclcpp::NodeOptions &options)
-                                                   : Node(controller->model()->name()+"_cartesian_tracking_server", options),
-                                                     _mutex(mutex),
-                                                     _controller(controller)
+                                                   const std::string &actionName,
+                                                   const std::string &controlTopicName)
+                                                   : ActionServerBase(node,
+                                                                      controller,
+                                                                      mutex,
+                                                                      actionName,
+                                                                      controlTopicName)
 {
-    // Check the arguments are sound
-    if(controller == nullptr)
-    {
-        throw std::invalid_argument("[ERROR] [TRACK CARTESIAN TRAJECTORY] Constructor: "
-                                    "Pointer to controller was null.");
-    }
-    else if(mutex == nullptr)
-    {
-        throw std::invalid_argument("[ERROR] [TRACK CARTESIAN TRAJECTORY] Constructor: "
-                                    "Pointer to mutex was null.");   
-    }
-     
-    // Create the action server
-    using namespace std::placeholders;
-    
-    _actionServer = rclcpp_action::create_server<CartesianTrajectoryAction>(
-        this,
-        "track_cartesian_trajectory",
-        std::bind(&TrackCartesianTrajectory::request_tracking, this, _1, _2),
-        std::bind(&TrackCartesianTrajectory::cancel, this, _1),
-        std::bind(&TrackCartesianTrajectory::track_cartesian_trajectory,this,_1)
-    );
-    
-    // Create publisher for sending commands
-    RCLCPP_INFO(this->get_logger(), "Publishing control output to '%s'.", controlTopicName.c_str());
-    
-    _jointControlPublisher = this->create_publisher<std_msgs::msg::Float64MultiArray>(controlTopicName, 1);
+    // Need to do something here
 }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////// 
@@ -127,19 +91,19 @@ TrackCartesianTrajectory::TrackCartesianTrajectory(SerialLinkBase *controller,
 ////////////////////////////////////////////////////////////////////////////////////////////////////  
 inline                             
 rclcpp_action::GoalResponse
-TrackCartesianTrajectory::request_tracking(const rclcpp_action::GoalUUID &uuid,
-                                           std::shared_ptr<const CartesianTrajectoryAction::Goal> request)
+TrackCartesianTrajectory::request_action(const rclcpp_action::GoalUUID &uuid,
+                                         std::shared_ptr<const Action::Goal> request)
 {
     (void)uuid;                                                                                     // Prevents colcon from throwing a warning
     
     // Try to lock the mutex and reject if another action is running
     if (!_mutex->try_lock())
     {
-        RCLCPP_WARN(this->get_logger(), "Request rejected. Another action server is currently running.");
+        RCLCPP_WARN(_node->get_logger(), "Request rejected. Another action server is currently running.");
         return rclcpp_action::GoalResponse::REJECT;
     }
     
-    RCLCPP_WARN(this->get_logger(), "Request for Cartesian control received.");
+    RCLCPP_WARN(_node->get_logger(), "Request for Cartesian control received.");
     
     std::vector<double> times(1, 0.0);                                                              // Initialise time vector with start of 0.0s
     
@@ -185,7 +149,7 @@ TrackCartesianTrajectory::request_tracking(const rclcpp_action::GoalUUID &uuid,
    }
    catch(const std::exception &exception)
    {
-        RCLCPP_ERROR(this->get_logger(), "Trajectory creation failed: %s", exception.what());
+        RCLCPP_ERROR(_node->get_logger(), "Trajectory creation failed: %s", exception.what());
         
         _mutex->unlock();
         
@@ -200,11 +164,11 @@ TrackCartesianTrajectory::request_tracking(const rclcpp_action::GoalUUID &uuid,
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 inline
 rclcpp_action::CancelResponse
-TrackCartesianTrajectory::cancel(const std::shared_ptr<CartesianTrajectoryManager> actionManager)
+TrackCartesianTrajectory::cancel(const std::shared_ptr<ActionManager> actionManager)
 {
-    RCLCPP_INFO(this->get_logger(), "Received request to cancel Cartesian trajectory tracking.");
+    RCLCPP_INFO(_node->get_logger(), "Received request to cancel Cartesian trajectory tracking.");
     
-    auto result = std::make_shared<CartesianTrajectoryAction::Result>();                            // Result portion of the action  
+    auto result = std::make_shared<Action::Result>();                                               // Result portion of the action  
             
     result->successful = -2;                                                                        // CANCELLED
     
@@ -220,10 +184,10 @@ TrackCartesianTrajectory::cancel(const std::shared_ptr<CartesianTrajectoryManage
 ////////////////////////////////////////////////////////////////////////////////////////////////////  
 inline
 void
-TrackCartesianTrajectory::track_cartesian_trajectory(const std::shared_ptr<CartesianTrajectoryManager> actionManager)
+TrackCartesianTrajectory::execute_action(const std::shared_ptr<ActionManager> actionManager)
 {
     auto request = actionManager->get_goal();                                                       // Retrieve goal
-    auto result = std::make_shared<CartesianTrajectoryAction::Result>();                            // Stores the result statistics, message
+    auto result = std::make_shared<Action::Result>();                                               // Stores the result statistics, message
     rclcpp::Rate loopRate(_controller->frequency());                                                // This regulates the control frequency
     unsigned long long n = 1;                                                                       // This is used for computing statistics
 
@@ -245,7 +209,7 @@ TrackCartesianTrajectory::track_cartesian_trajectory(const std::shared_ptr<Carte
     // Handle delay before starting trajectory tracking
     if (request->delay > 0.0)
     {
-        RCLCPP_INFO(this->get_logger(), "Counting down...");
+        RCLCPP_INFO(_node->get_logger(), "Counting down...");
         
         while (rclcpp::ok())
         {
@@ -253,7 +217,7 @@ TrackCartesianTrajectory::track_cartesian_trajectory(const std::shared_ptr<Carte
             
             if (_feedback->time_remaining <= 0.0) break;
             
-            RCLCPP_INFO(this->get_logger(), "%i", static_cast<int>(_feedback->time_remaining));
+            RCLCPP_INFO(_node->get_logger(), "%i", static_cast<int>(_feedback->time_remaining));
             
             rclcpp::sleep_for(std::chrono::seconds(1));
         }
@@ -261,7 +225,7 @@ TrackCartesianTrajectory::track_cartesian_trajectory(const std::shared_ptr<Carte
 
     // Start trajectory tracking
     
-    RCLCPP_INFO(this->get_logger(), "Executing Cartesian trajectory tracking.");
+    RCLCPP_INFO(_node->get_logger(), "Executing Cartesian trajectory tracking.");
     
     startTime = timer.now().seconds();
 
@@ -277,15 +241,9 @@ TrackCartesianTrajectory::track_cartesian_trajectory(const std::shared_ptr<Carte
                      desiredVelocity,
                      desiredAcceleration] = _trajectory.query_state(elapsedTime);                   // Get the desired state from the trajectory generator at the given time
 
-        Eigen::VectorXd control = _controller->track_endpoint_trajectory(desiredPose,
-                                                                         desiredVelocity,
-                                                                         desiredAcceleration);      // Solve the resolved motion rate control algorithm
-        
-        // Add control to message and publish
-        std_msgs::msg::Float64MultiArray msg;   
-        msg.data = {control.data(), control.data() + control.size()};
-        
-        _jointControlPublisher->publish(msg);
+        publish_joint_command(_controller->track_endpoint_trajectory(desiredPose,
+                                                                     desiredVelocity,
+                                                                     desiredAcceleration));         // Solve the resolved motion rate control algorithm
            
         // Put actual state data in to feedback field
         Pose actualPose = _controller->endpoint_pose();
@@ -347,13 +305,13 @@ TrackCartesianTrajectory::track_cartesian_trajectory(const std::shared_ptr<Carte
     // Send the result to the client
     if (rclcpp::ok())
     {
-        RCLCPP_INFO(this->get_logger(), "Trajectory tracking complete.");
+        RCLCPP_INFO(_node->get_logger(), "Trajectory tracking complete.");
 
         result->successful = 1;
 
         actionManager->succeed(result);
 
-        RCLCPP_INFO(this->get_logger(), "Awaiting new request.");
+        RCLCPP_INFO(_node->get_logger(), "Awaiting new request.");
         
         _mutex->unlock();
     }
