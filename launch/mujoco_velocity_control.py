@@ -20,7 +20,7 @@ def generate_launch_description():
         DeclareLaunchArgument('urdf_location', default_value=urdf_location, description='Path to the URDF file'),
         DeclareLaunchArgument('endpoint_name', default_value='link7', description='Name of the endpoint'),
 
-        # Node configuration
+        # Node configuration for velocity control server
         Node(
             package='serial_link_action_server',
             executable='velocity_control_server',
@@ -33,6 +33,18 @@ def generate_launch_description():
                     'control_topic_name': 'joint_commands'
                 }
             ]
+        ),
+
+        # Node configuration for MujocoRelayNode
+        Node(
+            package='serial_link_action_server',  # Your package name
+            executable='mujoco_relay',            # The name of your executable
+            output='screen',                      # Display output on the screen
+            name='mujoco_relay',                  # Optional: you can name the node
+            parameters=[{
+                'subscription_name': 'mujoco_relay',  # Subscription topic
+                'publication_name': 'joint_commands'  # Publication topic
+            }]
         )
     ])
 
