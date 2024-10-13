@@ -1,8 +1,15 @@
 /**
+<<<<<<< HEAD
  * @file   ServerBase.h
  * @author Jon Woolfrey
  * @data   June 2024
  * @brief  A base class for SerialLink action servers.
+=======
+ * @file   ActionServerBase.h
+ * @author Jon Woolfrey
+ * @data   October 2024
+ * @brief  A base class for standardising action servers for serial link robots.
+>>>>>>> devel
  */
 
 #ifndef ACTIONSERVER_BASE_H
@@ -18,31 +25,32 @@
  * This is a base class to standardise actions for control of serial link robots.
  */
 template <class Action>
-class ActionServerBase : public rclcpp::Node
-{
-    protected:
-        
-        // Easier referencing
-        using ActionManager = rclcpp_action::ServerGoalHandle<Action>;  
-        using JointCommandMsg = serial_link_action_server::msg::JointCommand;                       
-        
+class ActionServerBase
+{ 
     public:
+    
+        using ActionManager = rclcpp_action::ServerGoalHandle<Action>;  
+        
+        using JointCommandMsg = serial_link_action_server::msg::JointCommand; 
             
         /**
          * Constructor for the class.
-         * @param A pointer to a robot arm controller.
-         * @param A pointer to the mutex object
-         * @param The name of the topic for publishing joint commands
+         * @param node A pointer to a node
+         * @param controller A pointer to a robot arm controller.
+         * @param mutex A pointer to the mutex object
+         * @param controlTopicName The name of the topic for publishing joint commands
          * @param options I have no idea what this does ¯\_(ツ)_/¯
          */
-        ActionServerBase(SerialLinkBase *controller,
+        ActionServerBase(std::shared_ptr<rclcpp::Node> node,
+                         SerialLinkBase *controller,
                          std::mutex *mutex,
-                         const std::string &serverName = "you_forgot_to_name_me_you_rube",
-                         const std::string &controlTopicName = "joint_commands",
-                         const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
+                         const std::string &actionName = "you_forgot_to_name_me_you_rube",
+                         const std::string &controlTopicName = "joint_commands");
     
     protected:
         
+        std::shared_ptr<rclcpp::Node>_node;                                                         ///< Pointer to a node
+
         std::mutex *_mutex;                                                                         ///< Blocks other actions from controlling same robot
         
         unsigned int _numJoints;                                                                    ///< Number of joints being controlled
@@ -90,6 +98,7 @@ class ActionServerBase : public rclcpp::Node
         
         /**
          * This does exactly what it says.
+         * @param command A vector of joint commands (positions, velocities, or torques)
          */
         void
         publish_joint_command(const Eigen::VectorXd &command);
@@ -100,12 +109,12 @@ class ActionServerBase : public rclcpp::Node
  //                                          Constructor                                           //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 template <class Action>
-ActionServerBase<Action>::ActionServerBase(SerialLinkBase *controller,
+ActionServerBase<Action>::ActionServerBase(std::shared_ptr<rclcpp::Node> node,
+                                           SerialLinkBase *controller,
                                            std::mutex *mutex,
-                                           const std::string &serverName,
-                                           const std::string &controlTopicName,
-                                           const rclcpp::NodeOptions &options)
-                                           : Node(controller->model()->name()+"_"+serverName, options),
+                                           const std::string &actionName,
+                                           const std::string &controlTopicName)
+                                           : _node(node),
                                              _mutex(mutex),
                                              _numJoints(controller->model()->number_of_joints()),
                                              _controller(controller)
@@ -114,20 +123,25 @@ ActionServerBase<Action>::ActionServerBase(SerialLinkBase *controller,
 
     // Initialise the action server, link methods
     _actionServer = rclcpp_action::create_server<Action>(
-        this, serverName,
+        _node,
+        actionName,
         std::bind(&ActionServerBase::request_action, this, _1, _2),
         std::bind(&ActionServerBase::cancel, this, _1),
         std::bind(&ActionServerBase::execute_action,this,_1)
     );
     
-    for(unsigned int i = 0; i < _numJoints; ++i)
-    {
+    // NOTE: Be careful with the increment ++i...!
+    for(unsigned int i = 0; i < _numJoints-1; ++i)
+    {   
         _jointCommand.name.push_back(controller->model()->joint(i).name());
     }
       
-    _jointCommandPublisher = this->create_publisher<JointCommandMsg>(controlTopicName, 1);          // Create publisher for joint commands
+    _jointCommandPublisher = _node->create_publisher<JointCommandMsg>(controlTopicName, 1);         // Create publisher for joint commands
                                                   
-    RCLCPP_INFO(this->get_logger(), "Server initiated. Publishing control output to '%s'.", controlTopicName.c_str());
+    RCLCPP_INFO(_node->get_logger(),
+                "'%s' action initiated. Publishing control output to '%s'.",
+                actionName.c_str(),
+                controlTopicName.c_str());
 }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -137,7 +151,7 @@ template <class Action>
 void
 ActionServerBase<Action>::publish_joint_command(const Eigen::VectorXd &command)
 {
-    _jointCommand.stamp = this->now();                                                              // Add time of publication
+    _jointCommand.stamp = _node->now();                                                             // Add time of publication
     _jointCommand.command = {command.data(), command.data() + command.size()};                      // Add solution
     _jointCommandPublisher->publish(_jointCommand);                                                 // Publish control topic
 }

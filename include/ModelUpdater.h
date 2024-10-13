@@ -57,9 +57,10 @@ ModelUpdater::ModelUpdater(KinematicTree *model, const std::string &topicName)
     std::string message = "Subscribing to '" + this->_topicName + "' joint state topic.";
     
     RCLCPP_INFO(this->get_logger(), message.c_str());
-    
+     
+    // Set initial state
     model->update_state(Eigen::VectorXd::Zero(model->number_of_joints()),
-                        Eigen::VectorXd::Zero(model->number_of_joints()));
+                        Eigen::VectorXd::Zero(model->number_of_joints()));             
 }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -76,11 +77,16 @@ ModelUpdater::update(const JointState &state)
         
         return;
     }
-    else if(not this->_model->update_state(Eigen::Map<const Eigen::VectorXd>(state.position.data(), state.position.size()),
-                                           Eigen::Map<const Eigen::VectorXd>(state.velocity.data(), state.velocity.size())))
+   
+    
+    try
     {
-        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
-        "Failed to update robot state.");
+        this->_model->update_state(Eigen::Map<const Eigen::VectorXd>(state.position.data(), state.position.size()),
+                                   Eigen::Map<const Eigen::VectorXd>(state.velocity.data(), state.velocity.size()));
+    }
+    catch(const std::exception &exception)
+    {
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000, exception.what());
         
         return;
     }
