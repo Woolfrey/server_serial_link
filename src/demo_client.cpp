@@ -14,24 +14,34 @@
 
 using TrackJointTrajectory = serial_link_action_server::action::TrackJointTrajectory;
 
+/**
+ * This thread spins the client node indefinitely.
+ * @param node The thing we want to run in the background.
+ */
+void spin_node(rclcpp::Node::SharedPtr node)
+{
+    rclcpp::spin(node);
+}
+
   /////////////////////////////////////////////////////////////////////////////////////////////////////
  //                                          MAIN                                                   //
 /////////////////////////////////////////////////////////////////////////////////////////////////////
+
 int main(int argc, char **argv)
 {
-    if(argc != 2) throw std::invalid_argument("Require number of joints as input.");                // Self-evident
+    if (argc != 2) throw std::invalid_argument("Require number of joints as input.");
 
-    int numJoints = std::stoi(argv[1]);                                                             // Get the number of joints from the argument
-        
-    rclcpp::init(argc, argv);                                                                       // Initialize ROS2
+    int numJoints = std::stoi(argv[1]);
+    rclcpp::init(argc, argv);
 
     // Create the client node and clients
-    auto clientNode = rclcpp::Node::make_shared("serial_link_demo_client");                         // Create node
-    
-    JointTrajectoryClient jointTrajectoryClient(clientNode, "track_joint_trajectory");              // Create client
-   
-    bool clientActive = true;  // Main loop control flag
-    
+    auto clientNode = rclcpp::Node::make_shared("serial_link_demo_client");
+    JointTrajectoryClient jointTrajectoryClient(clientNode, "track_joint_trajectory");
+
+    std::thread spinThread(spin_node, clientNode);                                                  // Start spinning the node in a separate thread
+
+    bool clientActive = true;                                                                       // Main loop control flag
+
     while (clientActive && rclcpp::ok())
     {
         RCLCPP_INFO(clientNode->get_logger(), "Enter command (close, home, random):");
@@ -47,7 +57,7 @@ int main(int argc, char **argv)
             clientActive = false;
         }
         // Handle joint trajectory commands ("home" or "random")
-        else if (commandPrompt == "home" or commandPrompt == "random")
+        else if (commandPrompt == "home" || commandPrompt == "random")
         {
             serial_link_action_server::msg::JointTrajectoryPoint endPoint;
             endPoint.time = 5.0;  // Set movement time
@@ -56,9 +66,7 @@ int main(int argc, char **argv)
             if (commandPrompt == "home")
             {
                 RCLCPP_INFO(clientNode->get_logger(), "Moving to home position.");
-                endPoint.position.assign(numJoints, 0.0);                                           // All joints to 0
-                endPoint.velocity.assign(numJoints, 0.0);
-                endPoint.acceleration.assign(numJoints, 0.0);
+                endPoint.position.assign(numJoints, 0.0); // All joints to 0
             }
             else if (commandPrompt == "random")
             {
@@ -67,11 +75,10 @@ int main(int argc, char **argv)
                 std::default_random_engine randomEngine(static_cast<unsigned>(std::time(0)));
 
                 // Assign random positions
+                endPoint.position.clear(); // Clear previous positions
                 for (int i = 0; i < numJoints; ++i)
                 {
                     endPoint.position.push_back(uniformDistribution(randomEngine));
-                    endPoint.velocity.push_back(0.0);
-                    endPoint.acceleration.push_back(0.0);
                 }
             }
 
@@ -84,10 +91,12 @@ int main(int argc, char **argv)
         }
         else
         {
-            // Need to cancel the action
+            RCLCPP_WARN(clientNode->get_logger(), "Unknown command. Please enter 'close', 'home', or 'random'.");
         }
     }
 
-    rclcpp::shutdown();                                                                             // Shutdown ROS2
+    // Clean up and shutdown
+    rclcpp::shutdown();
+    spinThread.join(); // Wait for the spin thread to finish
     return 0;
 }
