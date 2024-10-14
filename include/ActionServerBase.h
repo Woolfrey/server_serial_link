@@ -1,15 +1,8 @@
 /**
-<<<<<<< HEAD
- * @file   ServerBase.h
- * @author Jon Woolfrey
- * @data   June 2024
- * @brief  A base class for SerialLink action servers.
-=======
  * @file   ActionServerBase.h
  * @author Jon Woolfrey
  * @data   October 2024
  * @brief  A base class for standardising action servers for serial link robots.
->>>>>>> devel
  */
 
 #ifndef ACTIONSERVER_BASE_H
