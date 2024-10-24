@@ -1,14 +1,9 @@
 ################## GOAL ####################
-CartesianTrajectoryPoint[] points           # Joint state at a particular time on the trajectory
-float64 delay 0.0                           # How long before the robot should start moving
+CartesianTrajectoryPoint[] points           # Cartesian state at a particular time on the trajectory
 ---
 ################ RESULT ####################
 Statistics position_error                   # Contains information on mean, variance, min, max
 Statistics orientation_error                # Contains information on mean, variance, min, max
-int32 successful                            # Error code
-int32 SUCCESSFUL = 1                        # As it says on the label
-int32 INVALID_ARGUMENTS = -1                # Bad input arguments
-int32 OTHER = -2                            # Something else went wrong
 string message                              # Explanation of problem
 ---
 ################ FEEDBACK ##################
