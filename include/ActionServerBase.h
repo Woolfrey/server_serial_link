@@ -13,6 +13,7 @@
 #include <rclcpp_action/rclcpp_action.hpp>                                                          // ROS2 Action C++ libraries
 #include <RobotLibrary/SerialLinkBase.h>                                                            // Controller
 #include "serial_link_action_server/msg/joint_command.hpp"                                          // Custom message
+#include <thread>
 
 /**
  * This is a base class to standardise actions for control of serial link robots.
@@ -36,16 +37,15 @@ class ActionServerBase
          */
         ActionServerBase(std::shared_ptr<rclcpp::Node> node,
                          SerialLinkBase *controller,
-                         std::mutex *mutex,
                          const std::string &actionName = "you_forgot_to_name_me_you_rube",
                          const std::string &controlTopicName = "joint_commands");
     
     protected:
+
+        std::shared_ptr<rclcpp_action::ServerGoalHandle<Action>> _activeGoalHandle;
         
         std::shared_ptr<rclcpp::Node>_node;                                                         ///< Pointer to a node
 
-        std::mutex *_mutex;                                                                         ///< Blocks other actions from controlling same robot
-        
         unsigned int _numJoints;                                                                    ///< Number of joints being controlled
             
         typename rclcpp_action::Server<Action>::SharedPtr _actionServer;                            ///< This is the foundation for the class.
@@ -67,19 +67,9 @@ class ActionServerBase
          */
         virtual
         rclcpp_action::GoalResponse
-        request_action(const rclcpp_action::GoalUUID &uuid,
-                       std::shared_ptr<const typename Action::Goal> request) = 0;
-        
-        /**
-         * Processes the cancel request.
-         * This is a virtual function and must be defined in any derived class.
-         * @param actionManager A pointer to the rclcpp::ServerGoalHandle for this action
-         * @return rclcpp_action::CancelResponse::ACCEPT
-         */
-        virtual
-        rclcpp_action::CancelResponse
-        cancel(const std::shared_ptr<ActionManager> actionManager) = 0;
-        
+        process_request(const rclcpp_action::GoalUUID &uuid,
+                        std::shared_ptr<const typename Action::Goal> request) = 0;
+
         /**
          * This is the main control loop for joint trajectory tracking.
          * This is a virtual function and must be defined in any derived class.
@@ -87,8 +77,37 @@ class ActionServerBase
          */
         virtual
         void
-        execute_action(const std::shared_ptr<ActionManager> actionManager) = 0;   
+        execute(const std::shared_ptr<ActionManager> actionManager) = 0; 
+                
+        /**
+         * Processes the cancel request.
+         * This is a virtual function and must be defined in any derived class.
+         * @param actionManager A pointer to the rclcpp::ServerGoalHandle for this action
+         * @return rclcpp_action::CancelResponse::ACCEPT
+         */
+        rclcpp_action::CancelResponse
+        cancel(const std::shared_ptr<ActionManager> actionManager)
+        {
+            (void) actionManager;
+            
+            RCLCPP_INFO(_node->get_logger(), "Received request to cancel action.");
+            
+            return rclcpp_action::CancelResponse::ACCEPT;
+        }
         
+        /**
+         * If a goal is accepted, this method will generate a thread to run the control loop.
+         * This enables the server to process other requests without being blocked.
+         * @param actionManager A pointer to the rclcpp::ServerGoalHandle
+         */
+        void
+        prepare(const std::shared_ptr<ActionManager> actionManager)
+        {
+            (void) actionManager;
+            
+            std::thread{std::bind(&ActionServerBase::execute, this, std::placeholders::_1), actionManager}.detach();
+        }
+            
         /**
          * This does exactly what it says.
          * @param command A vector of joint commands (positions, velocities, or torques)
@@ -104,11 +123,9 @@ class ActionServerBase
 template <class Action>
 ActionServerBase<Action>::ActionServerBase(std::shared_ptr<rclcpp::Node> node,
                                            SerialLinkBase *controller,
-                                           std::mutex *mutex,
                                            const std::string &actionName,
                                            const std::string &controlTopicName)
                                            : _node(node),
-                                             _mutex(mutex),
                                              _numJoints(controller->model()->number_of_joints()),
                                              _controller(controller)
 {
@@ -118,12 +135,12 @@ ActionServerBase<Action>::ActionServerBase(std::shared_ptr<rclcpp::Node> node,
     _actionServer = rclcpp_action::create_server<Action>(
         _node,
         actionName,
-        std::bind(&ActionServerBase::request_action, this, _1, _2),
+        std::bind(&ActionServerBase::process_request, this, _1, _2),
         std::bind(&ActionServerBase::cancel, this, _1),
-        std::bind(&ActionServerBase::execute_action,this,_1)
+        std::bind(&ActionServerBase::prepare,this,_1)
     );
     
-    // NOTE: Be careful with the increment ++i...!
+    // Pre-assign joint names
     for(unsigned int i = 0; i < _numJoints-1; ++i)
     {   
         _jointCommand.name.push_back(controller->model()->joint(i).name());
