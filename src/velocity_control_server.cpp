@@ -12,59 +12,57 @@
 
 int main(int argc, char **argv)
 {
-    rclcpp::init(argc, argv);                                                                       // Launches ROS2
-    
-    // Load parameters
-    auto paramNode = std::make_shared<rclcpp::Node>("control_parameters");
+    rclcpp::init(argc, argv);  // Launches ROS2
 
-    double kp = paramNode->declare_parameter<double>("kp", 10.0);
-    double frequency = paramNode->declare_parameter<double>("frequency", 500.0);
-    std::string urdfLocation = paramNode->declare_parameter<std::string>("urdf_location", "");
-    std::string endpointName = paramNode->declare_parameter<std::string>("endpoint_name", "unnamed");
-    std::string controlTopicName = paramNode->declare_parameter<std::string>("control_topic_name", "joint_commands");
- 
     try
     {
-        KinematicTree robotModel(urdfLocation);                                                     // Create model
-        
+        auto paramNode = std::make_shared<rclcpp::Node>("param_loader");                            // Temporary node to load parameters
+
+        // Load all parameters at once
+        std::string urdfLocation = paramNode->declare_parameter<std::string>("urdf_location", "");
+        double kp = paramNode->declare_parameter<double>("kp", 10.0);
+        double frequency = paramNode->declare_parameter<double>("frequency", 500.0);
+        std::string endpointName = paramNode->declare_parameter<std::string>("endpoint_name", "unnamed");
+        std::string controlTopicName = paramNode->declare_parameter<std::string>("control_topic_name", "joint_commands");
+
+        paramNode.reset();                                                                          // Free the node and its resources
+
+        // Create model & controller
+        KinematicTree robotModel(urdfLocation);                                                     // Create the robot model
         SerialKinematicControl controller(&robotModel, endpointName, frequency);                    // Create controller, attach model
+        controller.set_joint_gains(kp, 1.0);                                                        // Set control gains
         
-        controller.set_joint_gains(kp, 1.0);                                                        // Second argument is trivial
-        
-        std::mutex mutex;                                                                           // Blocks 2 actions running simultaneously
- 
-        auto modelUpdaterNode = std::make_shared<ModelUpdater>(&robotModel);                        // Reads & updates joint state   
-            
-        // Create the action servers and attach them to the server node
-        auto serverNode = std::make_shared<rclcpp::Node>("action_server");
-        
+        // Create nodes
+        auto modelUpdaterNode = std::make_shared<ModelUpdater>(&robotModel);                        // Reads & updates joint state
+        auto serverNode = std::make_shared<rclcpp::Node>(robotModel.name() + "_action_server");     // Create server node
+
+        // List actions, attach server node
         TrackJointTrajectory jointTrajectoryServer(serverNode,
                                                    &controller,
-                                                   &mutex, 
                                                    "track_joint_trajectory",
                                                    "joint_command_relay");
-                                                         
+                                                   
         TrackCartesianTrajectory cartesianTrajectoryServer(serverNode,
                                                            &controller,
-                                                           &mutex,
                                                            "track_cartesian_trajectory",
-                                                           "joint_command_relay");   
-        
-        // Create multi-thread executor and add nodes
+                                                           "joint_command_relay");
+
+        // Add nodes to executor & spin
         rclcpp::executors::MultiThreadedExecutor executor;
-        executor.add_node(modelUpdaterNode);
-        executor.add_node(serverNode);
+        executor.add_node(modelUpdaterNode);                                                        // Add model updater node
+        executor.add_node(serverNode);                                                              // Add server node
 
-        executor.spin();                                                                            // Runs all the nodes on separate threads
+        executor.spin();                                                                            // Run the node(s)
 
-        rclcpp::shutdown();                                                                         // Shuts down ROS2   
+        rclcpp::shutdown();                                                                         // As it says
         
-        return 0;                                                                                   // Shut down program; no errors.        
+        return 0;                                                                                   // No errors
     }
-    catch(const std::exception &exception)
+    catch (const std::exception &exception)
     {
         std::cerr << exception.what() << "\n";
         
-        return -1;
+        return -1;                                                                                  // Error occurred
     }
 }
+
