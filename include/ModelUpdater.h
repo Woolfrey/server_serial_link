@@ -77,7 +77,6 @@ ModelUpdater::update(const JointState &state)
         
         return;
     }
-   
     
     try
     {
