@@ -12,15 +12,14 @@ def generate_launch_description():
     control_params = os.path.join(config_dir, 'mujoco_velocity_control.yaml')
 
     # Define LaunchConfigurations for parameters with default values
-    urdf_location = os.path.join(get_package_share_directory('serial_link_action_server'), 'test', 'iiwa14.urdf')
-    endpoint_name = LaunchConfiguration('endpoint_name', default='link7')
+    
+    urdf = LaunchConfiguration('urdf', default=os.path.join(get_package_share_directory('serial_link_action_server'), 'test/iiwa14.urdf'))    
+    
+    endpoint = LaunchConfiguration('endpoint', default='link7')
 
     return LaunchDescription([
-        # Declare launch arguments
-        DeclareLaunchArgument('urdf_location', default_value=urdf_location, description='Path to the URDF file'),
-        DeclareLaunchArgument('endpoint_name', default_value='link7', description='Name of the endpoint'),
 
-        # Node configuration for velocity control server
+        # Launch the action server
         Node(
             package='serial_link_action_server',
             executable='velocity_control_server',
@@ -28,23 +27,22 @@ def generate_launch_description():
             parameters=[
                 control_params,
                 {
-                    'urdf_location': urdf_location,
-                    'endpoint_name': endpoint_name,
-                    'control_topic_name': 'joint_commands'
+                    'urdf': urdf,
+                    'endpoint': endpoint,
+                    'control_topic': 'joint_commands'
                 }
             ]
         ),
 
-        # Node configuration for MujocoRelayNode
+        # Launch the MuJoCo control relay
         Node(
-            package='serial_link_action_server',  # Your package name
-            executable='mujoco_relay',            # The name of your executable
-            output='screen',                      # Display output on the screen
-            name='mujoco_relay',                  # Optional: you can name the node
+            package='serial_link_action_server',  
+            executable='mujoco_relay',
+            output='screen',
+            name='mujoco_relay',
             parameters=[{
-                'subscription_name': 'mujoco_relay',  # Subscription topic
-                'publication_name': 'joint_commands'  # Publication topic
+                'subscription_name': 'mujoco_relay',
+                'publication_name': 'joint_commands'
             }]
         )
     ])
-
