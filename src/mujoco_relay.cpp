@@ -1,6 +1,6 @@
 #include "rclcpp/rclcpp.hpp"
-#include "serial_link_action_server/msg/joint_command.hpp"  // Include custom message
-#include "std_msgs/msg/float64_multi_array.hpp"  // For joint_commands topic
+#include "serial_link_action_server/msg/joint_command.hpp"                                          // Custom message
+#include "std_msgs/msg/float64_multi_array.hpp"                                                     // For joint_commands topic
 
 class MujocoRelayNode : public rclcpp::Node
 {
@@ -15,7 +15,7 @@ class MujocoRelayNode : public rclcpp::Node
                         const std::string &publicationName = "joint_commands")
                         : Node(nodeName)
         {
-            mujoco_sub_ = this->create_subscription<JointCommandMsg>
+            _jointCommandSubscriber = this->create_subscription<JointCommandMsg>
             (
                 subscriptionName,                                                                   // Name of topic to subscribe to
                 1,                                                                                  // No. of msgs to retain
