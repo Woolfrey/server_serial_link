@@ -48,12 +48,12 @@ ament_target_dependencies(velocity_control_server
   "sensor_msgs"
   "std_msgs"
 )
+rosidl_get_typesupport_target(${PROJECT_NAME}__rosidl_typesupport_cpp ${PROJECT_NAME} "rosidl_typesupport_cpp")
 target_link_libraries(velocity_control_server
   ${PROJECT_NAME}__rosidl_typesupport_cpp  # Link the generated action typesupport
   Eigen3::Eigen
   RobotLibrary::RobotLibrary
 )
-rosidl_target_interfaces(velocity_control_server ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 # Demo Client
 add_executable(demo_client src/demo_client.cpp)
@@ -65,16 +65,30 @@ ament_target_dependencies(demo_client
   "std_msgs"
 )
 target_link_libraries(demo_client
-  ${PROJECT_NAME}__rosidl_typesupport_cpp  # Link the generated action typesupport
+  ${PROJECT_NAME}__rosidl_typesupport_cpp
   Eigen3::Eigen
   RobotLibrary::RobotLibrary
 )
-rosidl_target_interfaces(demo_client ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
+# Mujoco Relay
+add_executable(mujoco_relay src/mujoco_relay.cpp)
+ament_target_dependencies(mujoco_relay
+  "ament_cmake"
+  "rclcpp"
+  "rosidl_default_runtime"
+  "std_msgs"
+)
+target_link_libraries(mujoco_relay
+  ${PROJECT_NAME}__rosidl_typesupport_cpp
+  Eigen3::Eigen
+  RobotLibrary::RobotLibrary
+)
 
 # Installation
 install(TARGETS
   velocity_control_server
   demo_client
+  mujoco_relay
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -91,3 +105,4 @@ install(DIRECTORY test
 )
 
 ament_package()
+
