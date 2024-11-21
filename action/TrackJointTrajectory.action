@@ -1,6 +1,5 @@
 ################## GOAL ####################
 JointTrajectoryPoint[] points               # Joint state at a particular time on the trajectory
-float64 delay 0.0                           # How long before the robot should start moving
 int32 polynomial_order 3                    # Degrees of freedom in the interpolating polynomial
 ---
 ################ RESULT ####################
