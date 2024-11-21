@@ -5,8 +5,8 @@
  * @brief  This is for testing action servers.
  */
 
-#include "CartesianTrajectoryClient.h"
-#include "JointTrajectoryClient.h"
+#include "client/CartesianTrajectoryClient.h"
+#include "client/JointTrajectoryClient.h"
 #include <random>                                                                                   // For generating random numbers
 #include "rclcpp/rclcpp.hpp"                                                                        // ROS2 C++ library
 #include "rclcpp_action/rclcpp_action.hpp"                                                          // ROS2 C++ action library
@@ -49,7 +49,7 @@ int main(int argc, char **argv)
     {
     
         // Get user input
-        RCLCPP_INFO(clientNode->get_logger(), "Enter command (close, home, random).");
+        RCLCPP_INFO(clientNode->get_logger(), "Enter command (close, home, random, up, down, left, right, fore, aft, hold).");
         std::string commandPrompt;
         std::getline(std::cin, commandPrompt);
 
