@@ -23,26 +23,27 @@ class ActionServerBase
 { 
     public:
     
-        using ActionManager = rclcpp_action::ServerGoalHandle<Action>;  
+        using ActionManager = rclcpp_action::ServerGoalHandle<Action>;                              // For brevity
         
-        using JointCommandMsg = serial_link_action_server::msg::JointCommand; 
+        using JointCommandMsg = serial_link_action_server::msg::JointCommand;                       // For brevity
             
         /**
          * Constructor for the class.
-         * @param node A pointer to a node
-         * @param controller A pointer to a robot arm controller.
+         * @param node A pointer to a ROS2 node
+         * @param controller A pointer to an arm controller from RobotLibrary
          * @param mutex A pointer to the mutex object
          * @param controlTopicName The name of the topic for publishing joint commands
          * @param options I have no idea what this does ¯\_(ツ)_/¯
          */
         ActionServerBase(std::shared_ptr<rclcpp::Node> node,
-                         SerialLinkBase *controller,
+                         RobotLibrary::SerialLinkBase *controller,
+                         std::mutex *padlock,
                          const std::string &actionName = "you_forgot_to_name_me_you_rube",
                          const std::string &controlTopicName = "joint_commands");
     
     protected:
 
-        std::shared_ptr<rclcpp_action::ServerGoalHandle<Action>> _activeGoalHandle;
+        std::shared_ptr<rclcpp_action::ServerGoalHandle<Action>> _activeGoalHandle;                 ///< Used for processing action requests
         
         std::shared_ptr<rclcpp::Node>_node;                                                         ///< Pointer to a node
 
@@ -52,12 +53,14 @@ class ActionServerBase
 
         std::shared_ptr<typename Action::Feedback> _feedback = std::make_shared<typename Action::Feedback>(); ///< Use this to store feedback
         
-        SerialLinkBase* _controller;                                                                ///< Pointer to the controller
+        RobotLibrary::SerialLinkBase* _controller;                                                  ///< Pointer to the controller
         
         JointCommandMsg _jointCommand;                                                              ///< Stores information
         
         rclcpp::Publisher<JointCommandMsg>::SharedPtr _jointCommandPublisher;                       ///< Makes commands public on ROS2
 
+        std::mutex *_padlock;                                                                       ///< Used to prevent 2 actions controlling the robot simultaneously
+        
         /**
          * Processes the request to execute action.
          * This is a virtual function and must be defined by any derived class.
@@ -71,7 +74,7 @@ class ActionServerBase
                         std::shared_ptr<const typename Action::Goal> request) = 0;
 
         /**
-         * This is the main control loop for joint trajectory tracking.
+         * This contains the main control loop for the action.
          * This is a virtual function and must be defined in any derived class.
          * @param actionManager A pointer to the rclcpp::ServerGoalHandle for this action
          */
@@ -88,7 +91,7 @@ class ActionServerBase
         rclcpp_action::CancelResponse
         cancel(const std::shared_ptr<ActionManager> actionManager)
         {
-            (void) actionManager;
+            (void) actionManager;                                                                   // This stops colcon from issuing a warning
             
             RCLCPP_INFO(_node->get_logger(), "Received request to cancel action.");
             
@@ -103,7 +106,7 @@ class ActionServerBase
         void
         prepare(const std::shared_ptr<ActionManager> actionManager)
         {
-            (void) actionManager;
+            (void) actionManager;                                                                   // This stops colcon from issuing a warning
             
             std::thread{std::bind(&ActionServerBase::execute, this, std::placeholders::_1), actionManager}.detach();
         }
@@ -122,12 +125,14 @@ class ActionServerBase
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 template <class Action>
 ActionServerBase<Action>::ActionServerBase(std::shared_ptr<rclcpp::Node> node,
-                                           SerialLinkBase *controller,
+                                           RobotLibrary::SerialLinkBase *controller,
+                                           std::mutex *padlock,
                                            const std::string &actionName,
                                            const std::string &controlTopicName)
                                            : _node(node),
                                              _numJoints(controller->model()->number_of_joints()),
-                                             _controller(controller)
+                                             _controller(controller),
+                                             _padlock(padlock)
 {
     using namespace std::placeholders;
 
@@ -162,7 +167,7 @@ void
 ActionServerBase<Action>::publish_joint_command(const Eigen::VectorXd &command)
 {
     _jointCommand.stamp = _node->now();                                                             // Add time of publication
-    _jointCommand.command = {command.data(), command.data() + command.size()};                      // Add solution
+    _jointCommand.command = {command.data(), command.data() + command.size()};                      // Tansfer data
     _jointCommandPublisher->publish(_jointCommand);                                                 // Publish control topic
 }
 

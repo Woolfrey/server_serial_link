@@ -8,7 +8,7 @@
 #ifndef TRACKCARTESIANTRAJECTORY_H
 #define TRACKCARTESIANTRAJECTORY_H
 
-#include <ActionServerBase.h>
+#include "server/ActionServerBase.h"
 #include <RobotLibrary/CartesianSpline.h>                                                           // Trajectory generator
 #include "serial_link_action_server/action/track_cartesian_trajectory.hpp"                          // Custom generated action
 
@@ -19,22 +19,27 @@ class TrackCartesianTrajectory : public ActionServerBase<serial_link_action_serv
 {
     public:
 
-        using Action  = serial_link_action_server::action::TrackCartesianTrajectory;
-        using ActionManager = rclcpp_action::ServerGoalHandle<Action>;
+        using Action  = serial_link_action_server::action::TrackCartesianTrajectory;                // For brevity       
+        
+        using ActionManager = rclcpp_action::ServerGoalHandle<Action>;                              // For brevity
                 
         /**
          * Constructor for the class.
-         * @param A pointer to a robot arm controller.
-         * @param options I have no idea what this does ¯\_(ツ)_/¯
+         * @param node A (shared) pointer to a ROS2 node
+         * @param controller A raw pointer to a RobotLibrary controller
+         * @param padlock A raw pointer to a mutex for blocking other actions
+         * @param actionName What this action will be listed as on the ROS2 network
+         * @param controlTopicName For the publisher
          */
         TrackCartesianTrajectory(std::shared_ptr<rclcpp::Node> node,
-                                 SerialLinkBase *controller,
-                                 const std::string &actionName = "track_joint_trajectory",
+                                 RobotLibrary::SerialLinkBase *controller,
+                                 std::mutex *padlock,
+                                 const std::string &actionName = "track_cartesian_trajectory",
                                  const std::string &controlTopicName = "joint_commands");
     
     private:
            
-        CartesianSpline _trajectory;                                                                ///< Trajectory object
+        RobotLibrary::CartesianSpline _trajectory;                                                  ///< Trajectory object
 
         /**
          * Processes the request to execute action.
@@ -60,13 +65,16 @@ class TrackCartesianTrajectory : public ActionServerBase<serial_link_action_serv
  //                                         Constructor                                            //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 TrackCartesianTrajectory::TrackCartesianTrajectory(std::shared_ptr<rclcpp::Node> node,
-                                                   SerialLinkBase *controller,
+                                                   RobotLibrary::SerialLinkBase *controller,
+                                                   std::mutex *padlock,
                                                    const std::string &actionName,
                                                    const std::string &controlTopicName)
-                                                   : ActionServerBase(node,
-                                                                      controller,
-                                                                      actionName,
-                                                                      controlTopicName)
+                                                   : ActionServerBase(
+                                                        node,
+                                                        controller,
+                                                        padlock,
+                                                        actionName,
+                                                        controlTopicName)
 {
     // Need to do something here
 }
@@ -81,12 +89,21 @@ TrackCartesianTrajectory::process_request(const rclcpp_action::GoalUUID &uuid,
 {
     (void)uuid;                                                                                     // Prevents colcon from throwing a warning
 
-    RCLCPP_WARN(_node->get_logger(), "Request for Cartesian control received.");
-    
+    if(not _padlock->try_lock())
+    {
+        RCLCPP_WARN(_node->get_logger(),
+                    "Request for Cartesian trajectory tracking rejected. "
+                    "Another action is currently using the robot.");
+        
+        return rclcpp_action::GoalResponse::REJECT;
+    }
+  
     std::vector<double> times(1, 0.0);                                                              // Initialise time vector with start of 0.0s
     
-    std::vector<Pose> poses;                                                                        // Poses that make up the trajectory spline
+    std::vector<RobotLibrary::Pose> poses;                                                          // Poses that make up the trajectory spline
+    
     poses.reserve(request->points.size()+1);                                                        // Reserve space for efficiency
+    
     poses.emplace_back(_controller->endpoint_pose());                                               // First pose is current endpoint
     
     // Iterate over the poses in the request
@@ -102,21 +119,15 @@ TrackCartesianTrajectory::process_request(const rclcpp_action::GoalUUID &uuid,
                                          point.pose.orientation.x,
                                          point.pose.orientation.y,
                                          point.pose.orientation.z};
-                                         
-       if(point.reference == 0)                                                                     // Pose is in the global / base frame
-       {
-            poses.emplace_back(Pose(translation,quaternion));
-       }
-       else if(point.reference == 1)                                                                // Pose is in the endpoint frame
-       {
-            poses.emplace_back(poses.back()*Pose(translation, quaternion));
-       }
+       
+       // Check the frame of reference
+            if(point.reference == 0) poses.emplace_back(RobotLibrary::Pose(translation,quaternion));// In base frame
+       else if(point.reference == 1) poses.emplace_back(poses.back()*RobotLibrary::Pose(translation,quaternion)); // In current endpoint frame; transform to base
        else if(point.reference == 2)                                                                // Pose is relative to endpoint frame, but in base frame coordinates
        {
             translation = poses.back().translation() + translation;                                 // Add the translation
             quaternion  = poses.back().quaternion()*quaternion;                                     // Add the rotation
-            
-            poses.emplace_back(Pose(translation,quaternion));
+            poses.emplace_back(RobotLibrary::Pose(translation,quaternion));
        }
    }
    
@@ -136,7 +147,7 @@ TrackCartesianTrajectory::process_request(const rclcpp_action::GoalUUID &uuid,
     // Try to create the trajectory
     try
     {
-        _trajectory = CartesianSpline(poses,times,_controller->endpoint_velocity());
+        _trajectory = RobotLibrary::CartesianSpline(poses,times,_controller->endpoint_velocity());
     }
     catch(const std::exception &exception)
     {
@@ -154,7 +165,7 @@ TrackCartesianTrajectory::process_request(const rclcpp_action::GoalUUID &uuid,
 void
 TrackCartesianTrajectory::execute(const std::shared_ptr<ActionManager> actionManager)
 {
-    RCLCPP_INFO(_node->get_logger(), "Executing Cartesian trajectory tracking.");
+    RCLCPP_INFO(_node->get_logger(), "Executing Cartesian trajectory tracking.");                   // Server side info
     
     auto request = actionManager->get_goal();                                                       // Retrieve goal
     
@@ -168,8 +179,6 @@ TrackCartesianTrajectory::execute(const std::shared_ptr<ActionManager> actionMan
     
     double startTime = timer.now().seconds();
 
-    startTime = timer.now().seconds();
-
     double elapsedTime = 0.0;
     
     do
@@ -177,13 +186,15 @@ TrackCartesianTrajectory::execute(const std::shared_ptr<ActionManager> actionMan
         // Check for cancellation
         if(actionManager->is_canceling())
         {
-            result->message = "Cartesian trajectory tracking cancelled.";
+            _padlock->unlock();                                                                     // Release control of robot
+            
+            result->message = "Cartesian trajectory tracking cancelled.";                           // Message for client
 
-            actionManager->canceled(result);
+            actionManager->canceled(result);                                                        // Specify result as cancelled
             
             publish_joint_command(Eigen::VectorXd::Zero(_numJoints));                               // Ensure final command is zero
             
-            RCLCPP_INFO(_node->get_logger(), "Cartesian trajectory tracking cancelled.");
+            RCLCPP_INFO(_node->get_logger(), "Cartesian trajectory tracking cancelled.");           // Server side info
             
             return;
         }
@@ -202,7 +213,7 @@ TrackCartesianTrajectory::execute(const std::shared_ptr<ActionManager> actionMan
                                                                      desiredAcceleration));         // Solve the resolved motion rate control algorithm
            
         // Put actual state data in to feedback field
-        Pose actualPose = _controller->endpoint_pose();
+        RobotLibrary::Pose actualPose = _controller->endpoint_pose();
         Eigen::Vector<double,6> twist = _controller->endpoint_velocity();
         
         _feedback->actual.pose.position.x = actualPose.translation()[0];
@@ -260,9 +271,11 @@ TrackCartesianTrajectory::execute(const std::shared_ptr<ActionManager> actionMan
     // Send the result to the client
     if (rclcpp::ok())
     {
-        actionManager->succeed(result);
+        _padlock->unlock();                                                                            // Release control of robot
+        
+        actionManager->succeed(result);                                                             // Action completed successfully
 
-        RCLCPP_INFO(_node->get_logger(), "Trajectory tracking complete. Awaiting new request.");
+        RCLCPP_INFO(_node->get_logger(), "Trajectory tracking complete. Awaiting new request.");    // Server side info
     }
 }
             
