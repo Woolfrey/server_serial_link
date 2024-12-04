@@ -45,7 +45,7 @@ class ActionServerBase
 
         std::shared_ptr<rclcpp_action::ServerGoalHandle<Action>> _activeGoalHandle;                 ///< Used for processing action requests
         
-        std::shared_ptr<rclcpp::Node>_node;                                                         ///< Pointer to a node
+        std::shared_ptr<rclcpp::Node> _node;                                                        ///< Pointer to a node
 
         unsigned int _numJoints;                                                                    ///< Number of joints being controlled
             
@@ -59,7 +59,7 @@ class ActionServerBase
         
         rclcpp::Publisher<JointCommandMsg>::SharedPtr _jointCommandPublisher;                       ///< Makes commands public on ROS2
 
-        std::mutex *_padlock;                                                                       ///< Used to prevent 2 actions controlling the robot simultaneously
+        std::mutex* _padlock;                                                                       ///< Used to prevent 2 actions controlling the robot simultaneously
         
         /**
          * Processes the request to execute action.
@@ -89,14 +89,7 @@ class ActionServerBase
          * @return rclcpp_action::CancelResponse::ACCEPT
          */
         rclcpp_action::CancelResponse
-        cancel(const std::shared_ptr<ActionManager> actionManager)
-        {
-            (void) actionManager;                                                                   // This stops colcon from issuing a warning
-            
-            RCLCPP_INFO(_node->get_logger(), "Received request to cancel action.");
-            
-            return rclcpp_action::CancelResponse::ACCEPT;
-        }
+        cancel(const std::shared_ptr<ActionManager> actionManager);
         
         /**
          * If a goal is accepted, this method will generate a thread to run the control loop.
@@ -104,12 +97,7 @@ class ActionServerBase
          * @param actionManager A pointer to the rclcpp::ServerGoalHandle
          */
         void
-        prepare(const std::shared_ptr<ActionManager> actionManager)
-        {
-            (void) actionManager;                                                                   // This stops colcon from issuing a warning
-            
-            std::thread{std::bind(&ActionServerBase::execute, this, std::placeholders::_1), actionManager}.detach();
-        }
+        prepare(const std::shared_ptr<ActionManager> actionManager);
             
         /**
          * This does exactly what it says.
@@ -157,6 +145,41 @@ ActionServerBase<Action>::ActionServerBase(std::shared_ptr<rclcpp::Node> node,
                 "'%s' action initiated. Publishing control output to '%s'.",
                 actionName.c_str(),
                 controlTopicName.c_str());
+}
+  
+  ////////////////////////////////////////////////////////////////////////////////////////////////////
+ //                             Spin off a thread to execute the action                            //
+////////////////////////////////////////////////////////////////////////////////////////////////////
+template <class Action>
+void
+ActionServerBase<Action>::prepare(const std::shared_ptr<ActionManager> actionManager)
+{
+    (void) actionManager;                                                                           // This stops colcon from issuing a warning
+    
+    std::thread
+    {
+        std::bind
+        (
+            &ActionServerBase::execute,
+            this,
+            std::placeholders::_1
+        ),
+        actionManager
+    }.detach();
+}
+
+  ////////////////////////////////////////////////////////////////////////////////////////////////////
+ //                             Cancel an action that is running                                   //
+////////////////////////////////////////////////////////////////////////////////////////////////////
+template <class Action>
+rclcpp_action::CancelResponse
+ActionServerBase<Action>::cancel(const std::shared_ptr<ActionManager> actionManager)
+{
+    (void) actionManager;                                                                           // This stops colcon from issuing a warning
+    
+    RCLCPP_INFO(_node->get_logger(), "Received request to cancel action.");
+      
+    return rclcpp_action::CancelResponse::ACCEPT;
 }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
