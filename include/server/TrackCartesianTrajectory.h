@@ -38,8 +38,12 @@ class TrackCartesianTrajectory : public ActionServerBase<serial_link_action_serv
                                  const std::string &controlTopicName = "joint_commands");
     
     private:
-           
-        RobotLibrary::CartesianSpline _trajectory;                                                  ///< Trajectory object
+
+        serial_link_action_server::msg::Statistics _orientationError;                               ///< Statistical summary of orientation tracking performance
+        
+        serial_link_action_server::msg::Statistics _positionError;                                  ///< Statistical summary of position tracking performance
+       
+        RobotLibrary::CartesianSpline _trajectory;                                                  ///< Trajectory generator
 
         /**
          * Processes the request to execute action.
@@ -131,18 +135,16 @@ TrackCartesianTrajectory::process_request(const rclcpp_action::GoalUUID &uuid,
        }
    }
    
-    // Statistics
-    serial_link_action_server::msg::Statistics positionError;
-    positionError.mean = 0.0;
-    positionError.variance = 0.0;
-    positionError.min = std::numeric_limits<double>::max();
-    positionError.max = std::numeric_limits<double>::lowest();
+    // (Re)set statistics
+    _positionError.mean = 0.0;
+    _positionError.variance = 0.0;
+    _positionError.min = std::numeric_limits<double>::max();
+    _positionError.max = std::numeric_limits<double>::lowest();
 
-    serial_link_action_server::msg::Statistics orientationError;
-    orientationError.mean = 0.0;
-    orientationError.variance = 0.0;
-    orientationError.min = std::numeric_limits<double>::max();
-    orientationError.max = std::numeric_limits<double>::lowest();  
+    _orientationError.mean = 0.0;
+    _orientationError.variance = 0.0;
+    _orientationError.min = std::numeric_limits<double>::max();
+    _orientationError.max = std::numeric_limits<double>::lowest();  
    
     // Try to create the trajectory
     try
@@ -165,118 +167,116 @@ TrackCartesianTrajectory::process_request(const rclcpp_action::GoalUUID &uuid,
 void
 TrackCartesianTrajectory::execute(const std::shared_ptr<ActionManager> actionManager)
 {
-    RCLCPP_INFO(_node->get_logger(), "Executing Cartesian trajectory tracking.");                   // Server side info
-    
-    auto request = actionManager->get_goal();                                                       // Retrieve goal
-    
-    auto result = std::make_shared<Action::Result>();                                               // Stores the result statistics, message
-    
-    rclcpp::Rate loopRate(_controller->frequency());                                                // This regulates the control frequency
-    
-    unsigned long long n = 1;                                                                       // This is used for computing statistics
+    RCLCPP_INFO(_node->get_logger(), "Executing Cartesian trajectory tracking.");
 
+    auto request = actionManager->get_goal();
+    auto result = std::make_shared<Action::Result>();
+    rclcpp::Rate loopRate(_controller->frequency());
+
+    unsigned long long n = 1;                                                                       // Counter for statistics
     rclcpp::Clock timer;
-    
     double startTime = timer.now().seconds();
 
-    double elapsedTime = 0.0;
-    
-    do
-    {
-        // Check for cancellation
-        if(actionManager->is_canceling())
-        {
-            _padlock->unlock();                                                                     // Release control of robot
-            
-            result->message = "Cartesian trajectory tracking cancelled.";                           // Message for client
+    // Inline method
+    auto cleanup_and_send_result = [&](bool success, const std::string &message) {
+        result->position_error = _positionError;
+        result->orientation_error = _orientationError;
+        result->message = message;
 
-            actionManager->canceled(result);                                                        // Specify result as cancelled
-            
-            publish_joint_command(Eigen::VectorXd::Zero(_numJoints));                               // Ensure final command is zero
-            
-            RCLCPP_INFO(_node->get_logger(), "Cartesian trajectory tracking cancelled.");           // Server side info
-            
+        if (success)
+        {
+            actionManager->succeed(result);
+            RCLCPP_INFO(_node->get_logger(), "Trajectory tracking complete. Awaiting new request.");
+        }
+        else
+        {
+            actionManager->canceled(result);
+            publish_joint_command(Eigen::VectorXd::Zero(_numJoints)); // Zero the command
+            RCLCPP_INFO(_node->get_logger(), "Cartesian trajectory tracking cancelled.");
+        }
+
+        _padlock->unlock();                                                                         // Release control
+    };
+
+    while (rclcpp::ok())
+    {
+        double elapsedTime = timer.now().seconds() - startTime;
+
+        // Check if the action has been canceled
+        if (actionManager->is_canceling())
+        {
+            cleanup_and_send_result(false, "Cartesian trajectory tracking cancelled.");
             return;
         }
-        
-        _controller->update();                                                                      // Updates the Jacobian
-        
-        elapsedTime = timer.now().seconds() - startTime;                                            // Determine elapsed time
-        
-        const auto &[desiredPose,
-                     desiredVelocity,
-                     desiredAcceleration] = _trajectory.query_state(elapsedTime);                   // Get the desired state from the trajectory generator at the given time
 
-        // NOTE: Use try/catch here:
-        publish_joint_command(_controller->track_endpoint_trajectory(desiredPose,
-                                                                     desiredVelocity,
-                                                                     desiredAcceleration));         // Solve the resolved motion rate control algorithm
-           
-        // Put actual state data in to feedback field
+        if (elapsedTime > request->points.back().time)
+        {
+            break;
+        }
+
+        _controller->update();
+
+        const auto &[desiredPose, desiredVelocity, desiredAcceleration] = _trajectory.query_state(elapsedTime);
+
+        try
+        {
+            publish_joint_command(_controller->track_endpoint_trajectory(desiredPose, desiredVelocity, desiredAcceleration));
+        } catch (const std::exception &e)
+        {
+            RCLCPP_ERROR(_node->get_logger(), "Error in tracking algorithm: %s", e.what());
+            cleanup_and_send_result(false, "Error during trajectory tracking.");
+            return;
+        }
+
+        // Update feedback fields
         RobotLibrary::Pose actualPose = _controller->endpoint_pose();
-        Eigen::Vector<double,6> twist = _controller->endpoint_velocity();
-        
-        _feedback->actual.pose.position.x = actualPose.translation()[0];
-        _feedback->actual.pose.position.y = actualPose.translation()[1];
-        _feedback->actual.pose.position.z = actualPose.translation()[2];
-        _feedback->actual.pose.orientation.w = actualPose.quaternion().w();
-        _feedback->actual.pose.orientation.x = actualPose.quaternion().x();
-        _feedback->actual.pose.orientation.y = actualPose.quaternion().y();
-        _feedback->actual.pose.orientation.z = actualPose.quaternion().z();
-        
-        _feedback->actual.twist.linear.x = twist[0];
-        _feedback->actual.twist.linear.y = twist[1];
-        _feedback->actual.twist.linear.z = twist[2];
-        _feedback->actual.twist.angular.x = twist[3];
-        _feedback->actual.twist.angular.y = twist[4];
-        _feedback->actual.twist.angular.z = twist[5];  
-        
-        // Put desired state data in to feedback field
-        _feedback->desired.pose.position.x = desiredPose.translation()[0];
-        _feedback->desired.pose.position.y = desiredPose.translation()[1];
-        _feedback->desired.pose.position.z = desiredPose.translation()[2];
-        _feedback->desired.pose.orientation.w = desiredPose.quaternion().w();
-        _feedback->desired.pose.orientation.x = desiredPose.quaternion().x();
-        _feedback->desired.pose.orientation.y = desiredPose.quaternion().y();
-        _feedback->desired.pose.orientation.z = desiredPose.quaternion().z();
-        
-        _feedback->desired.twist.linear.x  = desiredVelocity[0];
-        _feedback->desired.twist.linear.y  = desiredVelocity[1];
-        _feedback->desired.twist.linear.z  = desiredVelocity[2];
-        _feedback->desired.twist.angular.x = desiredVelocity[3];
-        _feedback->desired.twist.angular.y = desiredVelocity[4];
-        _feedback->desired.twist.angular.z = desiredVelocity[5];
-        
-        _feedback->desired.accel.linear.x  = desiredAcceleration[0];
-        _feedback->desired.accel.linear.y  = desiredAcceleration[1];
-        _feedback->desired.accel.linear.z  = desiredAcceleration[2];
+        Eigen::Vector<double, 6> twist = _controller->endpoint_velocity();
+
+        auto update_pose_feedback = [](auto &feedbackPose, const RobotLibrary::Pose &pose)
+        {
+            feedbackPose.position.x = pose.translation()[0];
+            feedbackPose.position.y = pose.translation()[1];
+            feedbackPose.position.z = pose.translation()[2];
+            feedbackPose.orientation.w = pose.quaternion().w();
+            feedbackPose.orientation.x = pose.quaternion().x();
+            feedbackPose.orientation.y = pose.quaternion().y();
+            feedbackPose.orientation.z = pose.quaternion().z();
+        };
+
+        auto update_twist_feedback = [](auto &feedbackTwist, const Eigen::Vector<double, 6> &twist)
+        {
+            feedbackTwist.linear.x = twist[0];
+            feedbackTwist.linear.y = twist[1];
+            feedbackTwist.linear.z = twist[2];
+            feedbackTwist.angular.x = twist[3];
+            feedbackTwist.angular.y = twist[4];
+            feedbackTwist.angular.z = twist[5];
+        };
+
+        update_pose_feedback(_feedback->actual.pose, actualPose);
+        update_twist_feedback(_feedback->actual.twist, twist);
+        update_pose_feedback(_feedback->desired.pose, desiredPose);
+        update_twist_feedback(_feedback->desired.twist, desiredVelocity);
+
+        _feedback->desired.accel.linear.x = desiredAcceleration[0];
+        _feedback->desired.accel.linear.y = desiredAcceleration[1];
+        _feedback->desired.accel.linear.z = desiredAcceleration[2];
         _feedback->desired.accel.angular.x = desiredAcceleration[3];
         _feedback->desired.accel.angular.y = desiredAcceleration[4];
-        _feedback->desired.accel.angular.z = desiredAcceleration[5];  
-        
-        // Put pose error data in to feedback field
-        Eigen::Vector<double,6> error = actualPose.error(desiredPose);
+        _feedback->desired.accel.angular.z = desiredAcceleration[5];
+
+        Eigen::Vector<double, 6> error = actualPose.error(desiredPose);
         _feedback->position_error = error.head(3).norm();
-        _feedback->orientation_error = error.tail(3).norm(); 
-        _feedback->time_remaining = _trajectory.end_time() - elapsedTime;                           // As it says
-        
-        actionManager->publish_feedback(_feedback);                                                 // Make feedback available over ROS2 network
+        _feedback->orientation_error = error.tail(3).norm();
+        _feedback->time_remaining = _trajectory.end_time() - elapsedTime;
 
-        loopRate.sleep();                                                                           // Synchronize the control loop
+        actionManager->publish_feedback(_feedback);
 
-        ++n;                                                                                        // Increment counter
-        
-    } while (rclcpp::ok() and elapsedTime <= request->points.back().time);
-
-    // Send the result to the client
-    if (rclcpp::ok())
-    {
-        _padlock->unlock();                                                                            // Release control of robot
-        
-        actionManager->succeed(result);                                                             // Action completed successfully
-
-        RCLCPP_INFO(_node->get_logger(), "Trajectory tracking complete. Awaiting new request.");    // Server side info
+        loopRate.sleep();
+        ++n;
     }
+
+    cleanup_and_send_result(true, "Trajectory tracking completed.");
 }
             
 #endif
