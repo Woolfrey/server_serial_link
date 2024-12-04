@@ -15,13 +15,43 @@
 using TrackCartesianTrajectory = serial_link_action_server::action::TrackCartesianTrajectory;
 using TrackJointTrajectory     = serial_link_action_server::action::TrackJointTrajectory;
 
-/**
- * This thread spins the client node indefinitely.
- * @param node The thing we want to run in the background.
- */
-void spin_node(rclcpp::Node::SharedPtr node)
+
+bool stop_robot(ActionClientInterface *activeClient)
 {
-    rclcpp::spin(node);
+    if (activeClient == nullptr)
+    {
+        return true;                                                                                // No active action
+    }
+
+    // Possible return codes:
+    // 0 = Unknown
+    // 1 = Accepted
+    // 2 = Executing
+    // 3 = Canceling
+    // 4 = Succeeded
+    // 5 = Canceled
+    // 6 = Aborted
+
+    if (activeClient->status() == 0)
+    {
+        return false; // A problem
+    }
+
+    // If running, cancel
+    if (activeClient->status() == 1 || activeClient->status() == 2)
+    {
+        activeClient->cancel_action();
+    }
+
+    // Wait until action is resolved
+    while (activeClient->status() != 4 &&
+           activeClient->status() != 5 &&
+           activeClient->status() != 6)
+    {      
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));                                 // Wait for 100ms
+    }
+
+    return true;
 }
 
   /////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -31,52 +61,61 @@ int main(int argc, char **argv)
 {
     if (argc != 2) throw std::invalid_argument("Require number of joints as input.");
 
-    int numJoints = std::stoi(argv[1]);
-    rclcpp::init(argc, argv);
-
-    // Create the client node and clients
-    auto clientNode = rclcpp::Node::make_shared("serial_link_demo_client");
+    int numJoints = std::stoi(argv[1]);                                                             // Transfer
     
+    rclcpp::init(argc, argv);                                                                       // Starts up ROS2
+
+    auto clientNode = rclcpp::Node::make_shared("serial_link_demo_client");                         // Create client node and advertise its name
+ 
     JointTrajectoryClient jointTrajectoryClient(clientNode, "track_joint_trajectory");
     
     CartesianTrajectoryClient cartesianTrajectoryClient(clientNode, "track_cartesian_trajectory");
-
-    std::thread spinThread(spin_node, clientNode);                                                  // Start spinning the node in a separate thread
-
-    bool clientActive = true;                                                                       // Main loop control flag
-
-    while (clientActive && rclcpp::ok())
-    {
     
+    ActionClientInterface *activeClient = nullptr;                                                  // Use this to keep track of which action is running           
+    
+    std::thread{[clientNode]() { rclcpp::spin(clientNode); }}.detach();                             // Spin the node in a separate thread so we can continue
+  
+    while (rclcpp::ok())
+    {
         // Get user input
-        RCLCPP_INFO(clientNode->get_logger(), "Enter command (close, home, random, up, down, left, right, fore, aft, hold).");
+        RCLCPP_INFO(clientNode->get_logger(), "Enter a command. Type 'options' to a see a list.");
         std::string commandPrompt;
         std::getline(std::cin, commandPrompt);
 
         // Handle "close" command to shut down the client
-        if (commandPrompt == "close")
+        if (commandPrompt == "options")
+        {
+            RCLCPP_INFO(clientNode->get_logger(),
+                        "Here is a list of possible commands:\n"
+                        " - aft\n"
+                        " - close\n"
+                        " - cancel\n"
+                        " - down\n"
+                        " - fore\n"
+                        " - home\n"
+                        " - left\n"
+                        " - random\n"
+                        " - right\n"
+                        " - up");
+        }
+        else if (commandPrompt == "close")
         {
             RCLCPP_INFO(clientNode->get_logger(), "Shutting down.");
-            clientActive = false;
             
-            jointTrajectoryClient.cancel_action();
-            cartesianTrajectoryClient.cancel_action();
+            stop_robot(activeClient);
+
+            break;
         }
         else if(commandPrompt == "cancel" or  commandPrompt == "")
         {
-            jointTrajectoryClient.cancel_action();
-            cartesianTrajectoryClient.cancel_action();
+            stop_robot(activeClient);
         }
         else if (commandPrompt == "home" or commandPrompt == "random")
         {
-            // Check if action is currently running. Cancel if true.
-            if(jointTrajectoryClient.action_is_running())
+            if (activeClient != nullptr
+            and activeClient->is_running())
             {
-                jointTrajectoryClient.cancel_action();
-            }
-            else if(cartesianTrajectoryClient.action_is_running())
-            {
-                cartesianTrajectoryClient.cancel_action();
+                stop_robot(activeClient);
             }
             
             serial_link_action_server::msg::JointTrajectoryPoint endPoint;                          // Final state for the trajectory
@@ -87,12 +126,15 @@ int main(int argc, char **argv)
             if (commandPrompt == "home")
             {
                 RCLCPP_INFO(clientNode->get_logger(), "Moving to home position.");
+                
                 endPoint.position.assign(numJoints, 0.0);                                           // All joints to 0
             }
             else if (commandPrompt == "random")
             {
                 RCLCPP_INFO(clientNode->get_logger(), "Moving to random joint position.");
+                
                 std::uniform_real_distribution<double> uniformDistribution(-2.0, 2.0);
+                
                 std::default_random_engine randomEngine(static_cast<unsigned>(std::time(0)));
 
                 // Assign random positions
@@ -105,9 +147,12 @@ int main(int argc, char **argv)
 
             // Create goal and attach trajectory points
             auto goal = std::make_shared<TrackJointTrajectory::Goal>();
+            
             goal->points = {endPoint};
 
             jointTrajectoryClient.send_request(goal);
+            
+            activeClient = &jointTrajectoryClient;
         }
         // Handle cartesian trajectory commands
         else if (commandPrompt == "left" or commandPrompt == "right" or
@@ -115,16 +160,7 @@ int main(int argc, char **argv)
                  commandPrompt == "fore" or commandPrompt == "aft"   or
                  commandPrompt == "hold")
         {
-        
-            // Check if action is currently running. Cancel if true.
-            if(jointTrajectoryClient.action_is_running())
-            {
-                jointTrajectoryClient.cancel_action();
-            }
-            else if(cartesianTrajectoryClient.action_is_running())
-            {
-                cartesianTrajectoryClient.cancel_action();
-            }
+            stop_robot(activeClient);
             
             RCLCPP_INFO(clientNode->get_logger(), "Moving endpoint %s.", commandPrompt.c_str());
 
@@ -153,15 +189,16 @@ int main(int argc, char **argv)
             goal->points = {endPoint};                                                              // This turns it in to an array with 1 element
             
             cartesianTrajectoryClient.send_request(goal);
+        
+            activeClient = &cartesianTrajectoryClient;
         }
         else
         {
-            RCLCPP_WARN(clientNode->get_logger(), "Unknown command. Please enter 'close', 'home', or 'random'.");
+            RCLCPP_WARN(clientNode->get_logger(), "Unknown command. Type 'options' to see a list.");
         }
     }
 
-    // Clean up and shutdown
-    rclcpp::shutdown();
-    spinThread.join();                                                                              // Wait for the spin thread to finish
+    rclcpp::shutdown();                                                                             // Shut down
+
     return 0;
 }
