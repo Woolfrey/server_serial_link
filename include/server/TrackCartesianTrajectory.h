@@ -178,21 +178,34 @@ TrackCartesianTrajectory::execute(const std::shared_ptr<ActionManager> actionMan
     double startTime = timer.now().seconds();
 
     // Inline method
-    auto cleanup_and_send_result = [&](bool success, const std::string &message) {
+    auto cleanup_and_send_result = [&](const int &status, const std::string &message)
+    {
         result->position_error = _positionError;
         result->orientation_error = _orientationError;
         result->message = message;
-
-        if (success)
+        
+        switch(status)
         {
-            actionManager->succeed(result);
-            RCLCPP_INFO(_node->get_logger(), "Trajectory tracking complete. Awaiting new request.");
-        }
-        else
-        {
-            actionManager->canceled(result);
-            publish_joint_command(Eigen::VectorXd::Zero(_numJoints)); // Zero the command
-            RCLCPP_INFO(_node->get_logger(), "Cartesian trajectory tracking cancelled.");
+            case 1: // Successfully completed
+            {
+                actionManager->succeed(result);
+                RCLCPP_INFO(_node->get_logger(), "Cartesian trajectory tracking complete. Awaiting new request.");
+                break;
+            }
+            case 2: // Cancelled
+            {
+                actionManager->canceled(result);
+                publish_joint_command(Eigen::VectorXd::Zero(_numJoints));                           // Zero the command
+                RCLCPP_INFO(_node->get_logger(), "Cartesian trajectory tracking cancelled. Awaiting new request.");
+                break;
+            }
+            case 3: // Aborted
+            {
+                actionManager->abort(result);
+                publish_joint_command(Eigen::VectorXd::Zero(_numJoints));
+                RCLCPP_ERROR(_node->get_logger(), "Cartesian trajectory tracking aborted.");
+                break;
+            }
         }
 
         _padlock->unlock();                                                                         // Release control
@@ -205,7 +218,7 @@ TrackCartesianTrajectory::execute(const std::shared_ptr<ActionManager> actionMan
         // Check if the action has been canceled
         if (actionManager->is_canceling())
         {
-            cleanup_and_send_result(false, "Cartesian trajectory tracking cancelled.");
+            cleanup_and_send_result(2, "Cartesian trajectory tracking cancelled.");
             return;
         }
 
@@ -214,19 +227,27 @@ TrackCartesianTrajectory::execute(const std::shared_ptr<ActionManager> actionMan
             break;
         }
 
-        _controller->update();
+        _controller->update();                                                                      // Gets latest Jacobian
 
-        const auto &[desiredPose, desiredVelocity, desiredAcceleration] = _trajectory.query_state(elapsedTime);
+        const auto &[desiredPose,
+                     desiredVelocity,
+                     desiredAcceleration] = _trajectory.query_state(elapsedTime);                   // Query desired state for given time
 
+        Eigen::VectorXd jointCommands = Eigen::VectorXd::Zero(_numJoints);
+        
+        // QP solver may throw a runtime error, so we need to catch it here.
         try
         {
-            publish_joint_command(_controller->track_endpoint_trajectory(desiredPose, desiredVelocity, desiredAcceleration));
-        } catch (const std::exception &e)
+            jointCommands = _controller->track_endpoint_trajectory(desiredPose, desiredVelocity, desiredAcceleration);
+        }
+        catch (const std::exception &exception)
         {
-            RCLCPP_ERROR(_node->get_logger(), "Error in tracking algorithm: %s", e.what());
-            cleanup_and_send_result(false, "Error during trajectory tracking.");
+            RCLCPP_ERROR(_node->get_logger(), exception.what());
+            cleanup_and_send_result(3, "Resolved motion rate control failed.");                     // Abort
             return;
         }
+        
+        publish_joint_command(jointCommands);                                                       // Send commands over ROS2 network
 
         // Update feedback fields
         RobotLibrary::Pose actualPose = _controller->endpoint_pose();
@@ -276,7 +297,7 @@ TrackCartesianTrajectory::execute(const std::shared_ptr<ActionManager> actionMan
         ++n;
     }
 
-    cleanup_and_send_result(true, "Trajectory tracking completed.");
+    cleanup_and_send_result(1, "Cartesian trajectory tracking completed.");
 }
             
 #endif

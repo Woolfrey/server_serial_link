@@ -212,7 +212,8 @@ TrackJointTrajectory::execute(const std::shared_ptr<ActionManager> actionManager
         double elapsedTime = timer.now().seconds() - startTime;
 
         // Check if the action has been canceled
-        if (actionManager->is_canceling()) {
+        if (actionManager->is_canceling())
+        {
             cleanup_and_send_result(false, "Joint trajectory tracking cancelled.");
             return;
         }
