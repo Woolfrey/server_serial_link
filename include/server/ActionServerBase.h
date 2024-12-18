@@ -125,7 +125,8 @@ ActionServerBase<Action>::ActionServerBase(std::shared_ptr<rclcpp::Node> node,
     using namespace std::placeholders;
 
     // Initialise the action server, link methods
-    _actionServer = rclcpp_action::create_server<Action>(
+    _actionServer = rclcpp_action::create_server<Action>
+    (
         _node,
         actionName,
         std::bind(&ActionServerBase::process_request, this, _1, _2),
@@ -156,6 +157,7 @@ ActionServerBase<Action>::prepare(const std::shared_ptr<ActionManager> actionMan
 {
     (void) actionManager;                                                                           // This stops colcon from issuing a warning
     
+    // Create a thread that will run the main control loop
     std::thread
     {
         std::bind
