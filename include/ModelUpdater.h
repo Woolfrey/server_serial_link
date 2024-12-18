@@ -9,7 +9,7 @@
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <RobotLibrary/KinematicTree.h>
 
-using JointState = sensor_msgs::msg::JointState;
+using JointState = sensor_msgs::msg::JointState;                                                    // For brevity
 
 /**
  * This class / node will subscribe to a prescribed joint state topic and update the robot
@@ -24,7 +24,8 @@ class ModelUpdater : public rclcpp::Node
          * @param model A pointer to the kinematic/dynamic model of the robot.
          * @param topicName The name of the joint state topic to subscribe to.
          */
-        ModelUpdater(RobotLibrary::KinematicTree *model, const std::string &topicName = "joint_states");
+        ModelUpdater(RobotLibrary::KinematicTree *model,
+                     const std::string &topicName = "joint_states");
         
     private:
 
@@ -52,11 +53,9 @@ ModelUpdater::ModelUpdater(RobotLibrary::KinematicTree *model, const std::string
 {
     using namespace std::placeholders;                                                              // Used when binding callback function to subscriber
     
-    _subscription = this->create_subscription<JointState>(this->_topicName, 1, std::bind(&ModelUpdater::update, this, _1));
-
-    std::string message = "Subscribing to '" + this->_topicName + "' joint state topic.";
+    _subscription = this->create_subscription<JointState>(_topicName, 1, std::bind(&ModelUpdater::update, this, _1));
     
-    RCLCPP_INFO(this->get_logger(), message.c_str());
+    RCLCPP_INFO(this->get_logger(), "Subscribing to the '%s' joint state topic.", _topicName.c_str());
      
     // Set initial state
     model->update_state(Eigen::VectorXd::Zero(model->number_of_joints()),
@@ -80,8 +79,8 @@ ModelUpdater::update(const JointState &state)
     
     try
     {
-        this->_model->update_state(Eigen::Map<const Eigen::VectorXd>(state.position.data(), state.position.size()),
-                                   Eigen::Map<const Eigen::VectorXd>(state.velocity.data(), state.velocity.size()));
+        _model->update_state(Eigen::Map<const Eigen::VectorXd>(state.position.data(), state.position.size()),
+                             Eigen::Map<const Eigen::VectorXd>(state.velocity.data(), state.velocity.size()));
     }
     catch(const std::exception &exception)
     {
