@@ -15,7 +15,11 @@
 using TrackCartesianTrajectory = serial_link_action_server::action::TrackCartesianTrajectory;
 using TrackJointTrajectory     = serial_link_action_server::action::TrackJointTrajectory;
 
-
+/**
+ * This function manages the asynchronous cancellation sequence.
+ * @param activeClient A pointer to the action client that is currently running.
+ * @return True if/when successful, false if there was a problem.
+ */
 bool stop_robot(ActionClientInterface *activeClient)
 {
     if (activeClient == nullptr)
@@ -67,9 +71,9 @@ int main(int argc, char **argv)
 
     auto clientNode = rclcpp::Node::make_shared("serial_link_demo_client");                         // Create client node and advertise its name
  
-    JointTrajectoryClient jointTrajectoryClient(clientNode, "track_joint_trajectory");
+    JointTrajectoryClient jointTrajectoryClient(clientNode, "track_joint_trajectory", true);
     
-    CartesianTrajectoryClient cartesianTrajectoryClient(clientNode, "track_cartesian_trajectory");
+    CartesianTrajectoryClient cartesianTrajectoryClient(clientNode, "track_cartesian_trajectory", true);
     
     ActionClientInterface *activeClient = nullptr;                                                  // Use this to keep track of which action is running           
     
