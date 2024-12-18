@@ -2,7 +2,7 @@
  * @file   ActionClientBase.h
  * @author Jon Woolfrey
  * @data   October 2024
- * @brief  This is an interface class for action clients in ROS2.
+ * @brief  This is a base class for action clients in ROS2.
  */
 
 #ifndef ACTION_CLIENT_BASE_H
@@ -45,6 +45,15 @@ class ActionClientBase : public ActionClientInterface
         
         /**
          * This overrides the method defined in the base class.
+         * https://docs.ros2.org/foxy/api/action_msgs/msg/GoalStatus.html
+         * 0 = Unknown
+         * 1 = Accepted
+         * 2 = Executing
+         * 3 = Canceling
+         * 4 = Succeeded
+         * 5 = Canceled
+         * 6 = Aborted
+         * @return An int8_t for the status.
          */
         int8_t
         status() const override
@@ -53,10 +62,14 @@ class ActionClientBase : public ActionClientInterface
             else            return 0;
         }
         
+        /**
+         * Checks to see if an action is currently active.
+         * @return True if it is it is accepted (about to start), currently executing, or in the process of canceling.
+         */
         bool
         is_running() const override
         {
-            if(status() == 1
+            if(status() == 1    
             or status() == 2
             or status() == 3)
             {
@@ -79,21 +92,21 @@ class ActionClientBase : public ActionClientInterface
         typename rclcpp_action::ClientGoalHandle<Action>::SharedPtr _goalHandle;                    ///< Current goal handle
           
         /**
-         * This method executes after requesting an action from a server, and its given an answer.
+         * This method is used to process the response from the action server after sending a goal.
          * @param GoalHandle A pointer to the goal handle associated with the action.
          */
         void
         response_callback(const typename rclcpp_action::ClientGoalHandle<Action>::SharedPtr goalHandle);
         
         /**
-         * This method executes when an action is finished.
+         * This method executes when an action is finished
          * @param result The result portion of the associated goal field.
          */
         void
         result_callback(const typename rclcpp_action::ClientGoalHandle<Action>::WrappedResult &result);
             
         /**
-         *
+         * This method executes after an action server has completed the cancellation process.
          */
         void
         cancel_callback(const typename rclcpp_action::Client<Action>::CancelResponse::SharedPtr response);
@@ -175,22 +188,22 @@ ActionClientBase<Action>::result_callback(const typename rclcpp_action::ClientGo
     {
         case rclcpp_action::ResultCode::SUCCEEDED:
         {
-            RCLCPP_INFO(_node->get_logger(), "Action succeeded.");
+            RCLCPP_INFO(_node->get_logger(), "Action completed.");
             break;
         }
         case rclcpp_action::ResultCode::CANCELED:
         {
-            RCLCPP_INFO(_node->get_logger(), "Action was canceled.");
+            RCLCPP_INFO(_node->get_logger(), "Action canceled.");
             break;
         }
         case rclcpp_action::ResultCode::ABORTED:
         {
-            RCLCPP_INFO(_node->get_logger(), "Action failed.");
+            RCLCPP_INFO(_node->get_logger(), "Action aborted.");
             break;
         }
         default:
         {
-            RCLCPP_WARN(_node->get_logger(), "Unknown action result code.");
+            RCLCPP_WARN(_node->get_logger(), "Unknown result code.");
             break;
         }
     }
@@ -203,9 +216,11 @@ template <class Action>
 bool
 ActionClientBase<Action>::cancel_action()
 {
-    auto cancelFuture = _actionClient->async_cancel_goal(
+    auto cancelFuture = _actionClient->async_cancel_goal
+    (
         _goalHandle,
-        [this](const typename rclcpp_action::Client<Action>::CancelResponse::SharedPtr response) {
+        [this](const typename rclcpp_action::Client<Action>::CancelResponse::SharedPtr response)
+        {
             this->cancel_callback(response);
         }
     );
