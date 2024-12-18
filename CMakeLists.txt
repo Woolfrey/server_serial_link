@@ -45,6 +45,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 add_executable(velocity_control_server src/velocity_control_server.cpp)
 ament_target_dependencies(velocity_control_server
   "ament_cmake"
+  "geometry_msgs"
   "rclcpp"
   "rclcpp_action"
   "rosidl_default_runtime"
