@@ -8,9 +8,12 @@
 #ifndef TRACKCARTESIANTRAJECTORY_H
 #define TRACKCARTESIANTRAJECTORY_H
 
+#include "geometry_msgs/msg/pose.hpp"
+#include "geometry_msgs/msg/twist.hpp"
+#include "RobotLibrary/CartesianSpline.h"                                                           // Trajectory generator
 #include "server/ActionServerBase.h"
-#include <RobotLibrary/CartesianSpline.h>                                                           // Trajectory generator
 #include "serial_link_action_server/action/track_cartesian_trajectory.hpp"                          // Custom generated action
+
 
 /**
  * This class performs joint trajectory tracking for a serial link robot arm.
@@ -62,7 +65,47 @@ class TrackCartesianTrajectory : public ActionServerBase<serial_link_action_serv
          * @param actionManager A pointer to the rclcpp::ServerGoalHandle for this action
          */
         void
-        execute(const std::shared_ptr<ActionManager> actionManager);       
+        execute(const std::shared_ptr<ActionManager> actionManager);    
+        
+        /**
+         * Completes the action and send result to the client.
+         * @param status 1 = Success, 2 = Cancelled, 3 = Aborted
+         * @param message Information for the client.
+         */
+        void
+        cleanup_and_send_result(const int &status,
+                                const std::string &message,
+                                const std::shared_ptr<ActionManager> actionManager);
+        
+        /**
+         * Puts a RobotLibrary::Pose object in to a ROS2 geometry_msgs/Pose
+         * @param feedbackPose The ROS msg
+         * @param pose The RobotLibrary object.
+         */
+        void
+        RL_pose_to_ROS(geometry_msgs::msg::Pose &feedbackPose,
+                       const RobotLibrary::Pose &pose);
+        
+        /**
+         * Puts an Eigen::Vector<double,6> object in to a ROS2 geometry_msgs/Twist
+         * @param feedbackTwist the ROS2 msg
+         * @param twist the Eigen::Vector object
+         */
+        void
+        Eigen_twist_to_ROS(geometry_msgs::msg::Twist &feedbackTwist,
+                           const Eigen::Vector<double, 6> &twist);
+         
+        /**
+         * Recursively updates the performance statistics for the position and orientation error.
+         * @param statistics The custom msg for this package
+         * @param newValue The newly computed error norm
+         * @param n The sample size
+         */                  
+        void
+        update_statistics(serial_link_action_server::msg::Statistics &statistics,
+                                            const double &newValue,
+                                            const unsigned int &n);
+        
 };                                                                                                  // Semicolon required after a class declaration
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -169,81 +212,47 @@ TrackCartesianTrajectory::execute(const std::shared_ptr<ActionManager> actionMan
 {
     RCLCPP_INFO(_node->get_logger(), "Executing Cartesian trajectory tracking.");
 
-    auto request = actionManager->get_goal();
-    auto result = std::make_shared<Action::Result>();
-    rclcpp::Rate loopRate(_controller->frequency());
+    auto request = actionManager->get_goal();                                                       // Goal portion of the message
+
+    rclcpp::Rate loopRate(_controller->frequency());                                                // Sets control loop at robot control speed
 
     unsigned long long n = 1;                                                                       // Counter for statistics
-    rclcpp::Clock timer;
-    double startTime = timer.now().seconds();
-
-    // Inline method
-    auto cleanup_and_send_result = [&](const int &status, const std::string &message)
-    {
-        result->position_error = _positionError;
-        result->orientation_error = _orientationError;
-        result->message = message;
-        
-        switch(status)
-        {
-            case 1: // Successfully completed
-            {
-                actionManager->succeed(result);
-                RCLCPP_INFO(_node->get_logger(), "Cartesian trajectory tracking complete. Awaiting new request.");
-                break;
-            }
-            case 2: // Cancelled
-            {
-                actionManager->canceled(result);
-                publish_joint_command(Eigen::VectorXd::Zero(_numJoints));                           // Zero the command
-                RCLCPP_INFO(_node->get_logger(), "Cartesian trajectory tracking cancelled. Awaiting new request.");
-                break;
-            }
-            case 3: // Aborted
-            {
-                actionManager->abort(result);
-                publish_joint_command(Eigen::VectorXd::Zero(_numJoints));
-                RCLCPP_ERROR(_node->get_logger(), "Cartesian trajectory tracking aborted.");
-                break;
-            }
-        }
-
-        _padlock->unlock();                                                                         // Release control
-    };
+    rclcpp::Clock timer;                                                                            // Used to query trajectory
+    double startTime = timer.now().seconds();                                                       // Record start time
 
     while (rclcpp::ok())
     {
-        double elapsedTime = timer.now().seconds() - startTime;
-
         // Check if the action has been canceled
         if (actionManager->is_canceling())
         {
-            cleanup_and_send_result(2, "Cartesian trajectory tracking cancelled.");
+            cleanup_and_send_result(2, "Cartesian trajectory tracking cancelled.", actionManager);
             return;
         }
+        
+        double elapsedTime = timer.now().seconds() - startTime;                                     // As it says
 
-        if (elapsedTime > request->points.back().time)
-        {
-            break;
-        }
+        if (elapsedTime > request->points.back().time) break;                                       // Trajectory tracking complete
 
-        _controller->update();                                                                      // Gets latest Jacobian
+        _controller->update();                                                                      // Computes latest Jacobian
 
         const auto &[desiredPose,
                      desiredVelocity,
                      desiredAcceleration] = _trajectory.query_state(elapsedTime);                   // Query desired state for given time
 
-        Eigen::VectorXd jointCommands = Eigen::VectorXd::Zero(_numJoints);
+        Eigen::VectorXd jointCommands = Eigen::VectorXd::Zero(_numJoints);                          // We want to compute this
         
-        // QP solver may throw a runtime error, so we need to catch it here.
+        // Controller may throw an error if there is a problem,
+        // so we need to catch it here.
         try
         {
-            jointCommands = _controller->track_endpoint_trajectory(desiredPose, desiredVelocity, desiredAcceleration);
+            jointCommands = _controller->track_endpoint_trajectory(desiredPose,
+                                                                   desiredVelocity,
+                                                                   desiredAcceleration);            // Solve endpoint control with quadratic programming algorithm
         }
         catch (const std::exception &exception)
         {
             RCLCPP_ERROR(_node->get_logger(), exception.what());
-            cleanup_and_send_result(3, "Resolved motion rate control failed.");                     // Abort
+            cleanup_and_send_result(3, "Resolved motion rate control failed.", actionManager);      // Couldn't solve control; abort.
             return;
         }
         
@@ -253,32 +262,13 @@ TrackCartesianTrajectory::execute(const std::shared_ptr<ActionManager> actionMan
         RobotLibrary::Pose actualPose = _controller->endpoint_pose();
         Eigen::Vector<double, 6> twist = _controller->endpoint_velocity();
 
-        auto update_pose_feedback = [](auto &feedbackPose, const RobotLibrary::Pose &pose)
-        {
-            feedbackPose.position.x = pose.translation()[0];
-            feedbackPose.position.y = pose.translation()[1];
-            feedbackPose.position.z = pose.translation()[2];
-            feedbackPose.orientation.w = pose.quaternion().w();
-            feedbackPose.orientation.x = pose.quaternion().x();
-            feedbackPose.orientation.y = pose.quaternion().y();
-            feedbackPose.orientation.z = pose.quaternion().z();
-        };
+        RL_pose_to_ROS(_feedback->actual.pose, actualPose);
+        Eigen_twist_to_ROS(_feedback->actual.twist, twist);
+        
+        RL_pose_to_ROS(_feedback->desired.pose, desiredPose);
+        Eigen_twist_to_ROS(_feedback->desired.twist, desiredVelocity);
 
-        auto update_twist_feedback = [](auto &feedbackTwist, const Eigen::Vector<double, 6> &twist)
-        {
-            feedbackTwist.linear.x = twist[0];
-            feedbackTwist.linear.y = twist[1];
-            feedbackTwist.linear.z = twist[2];
-            feedbackTwist.angular.x = twist[3];
-            feedbackTwist.angular.y = twist[4];
-            feedbackTwist.angular.z = twist[5];
-        };
-
-        update_pose_feedback(_feedback->actual.pose, actualPose);
-        update_twist_feedback(_feedback->actual.twist, twist);
-        update_pose_feedback(_feedback->desired.pose, desiredPose);
-        update_twist_feedback(_feedback->desired.twist, desiredVelocity);
-
+        // Set the desired accelerations from the trajectory
         _feedback->desired.accel.linear.x = desiredAcceleration[0];
         _feedback->desired.accel.linear.y = desiredAcceleration[1];
         _feedback->desired.accel.linear.z = desiredAcceleration[2];
@@ -286,18 +276,121 @@ TrackCartesianTrajectory::execute(const std::shared_ptr<ActionManager> actionMan
         _feedback->desired.accel.angular.y = desiredAcceleration[4];
         _feedback->desired.accel.angular.z = desiredAcceleration[5];
 
+        // Compute position & orientation error, assign to feedback field
         Eigen::Vector<double, 6> error = actualPose.error(desiredPose);
+        
         _feedback->position_error = error.head(3).norm();
+        
         _feedback->orientation_error = error.tail(3).norm();
+              
+        update_statistics(_positionError, _feedback->position_error, n);
+        
+        update_statistics(_orientationError, _feedback->orientation_error, n);
+
         _feedback->time_remaining = _trajectory.end_time() - elapsedTime;
+        
+        actionManager->publish_feedback(_feedback);                                                 // Make feedback available over ROS2 network
 
-        actionManager->publish_feedback(_feedback);
-
-        loopRate.sleep();
-        ++n;
+        loopRate.sleep();                                                                           // Synchronise control
+        
+        ++n;                                                                                        // Increment counter for statistics
     }
 
-    cleanup_and_send_result(1, "Cartesian trajectory tracking completed.");
+    cleanup_and_send_result(1, "Cartesian trajectory tracking completed.", actionManager);
+}
+
+  ////////////////////////////////////////////////////////////////////////////////////////////////////
+ //                      Completes the action and sends the result to the client                   //
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void
+TrackCartesianTrajectory::cleanup_and_send_result(const int &status,
+                                                  const std::string &message,
+                                                  const std::shared_ptr<ActionManager> actionManager)
+{
+
+    publish_joint_command(Eigen::VectorXd::Zero(_numJoints));                                       // Ensure the last command is zero
+            
+    // Assign data to the result section of the actions
+    auto result = std::make_shared<Action::Result>();                                               // Result portion of the message
+    result->position_error = _positionError;
+    result->orientation_error = _orientationError;
+    result->message = message;
+    
+    switch(status)
+    {
+        case 1:                                                                                     // Successfully completed
+        {
+            actionManager->succeed(result);
+            RCLCPP_INFO(_node->get_logger(), "Cartesian trajectory tracking complete. Awaiting new request.");
+            break;
+        }
+        case 2:                                                                                     // Cancelled
+        {
+            actionManager->canceled(result);
+            RCLCPP_INFO(_node->get_logger(), "Cartesian trajectory tracking cancelled. Awaiting new request.");
+            break;
+        }
+        case 3:                                                                                     // Aborted
+        {
+            actionManager->abort(result);
+            RCLCPP_ERROR(_node->get_logger(), "Cartesian trajectory tracking aborted.");
+            break;
+        }
+    }
+
+    _padlock->unlock();                                                                             // Release control
+};
+
+  ////////////////////////////////////////////////////////////////////////////////////////////////////
+ //                Puts a RobotLibrary::Pose object into a ROS2 geometry_msgs/Pose                 //
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void
+TrackCartesianTrajectory::RL_pose_to_ROS(geometry_msgs::msg::Pose &feedbackPose,
+                                         const RobotLibrary::Pose &pose)
+{
+    feedbackPose.position.x    = pose.translation()[0];
+    feedbackPose.position.y    = pose.translation()[1];
+    feedbackPose.position.z    = pose.translation()[2];
+    feedbackPose.orientation.w = pose.quaternion().w();
+    feedbackPose.orientation.x = pose.quaternion().x();
+    feedbackPose.orientation.y = pose.quaternion().y();
+    feedbackPose.orientation.z = pose.quaternion().z();
+};
+  
+  ////////////////////////////////////////////////////////////////////////////////////////////////////
+ //              Puts an Eigen::Vector<double,6> object in to a ROS2 geometry_msgs/Twist           //
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void
+TrackCartesianTrajectory::Eigen_twist_to_ROS(geometry_msgs::msg::Twist &feedbackTwist,
+                                             const Eigen::Vector<double, 6> &twist)
+{
+    feedbackTwist.linear.x  = twist[0];
+    feedbackTwist.linear.y  = twist[1];
+    feedbackTwist.linear.z  = twist[2];
+    feedbackTwist.angular.x = twist[3];
+    feedbackTwist.angular.y = twist[4];
+    feedbackTwist.angular.z = twist[5];
+};
+
+  ////////////////////////////////////////////////////////////////////////////////////////////////////
+ //                     Updates min & max, and the mean and variance recursively                   //
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void
+TrackCartesianTrajectory::update_statistics(serial_link_action_server::msg::Statistics &statistics,
+                                            const double &newValue,
+                                            const unsigned int &n)
+{
+    statistics.min = std::min(statistics.min, newValue);
+    statistics.max = std::max(statistics.max, newValue);
+    
+    if(n > 1)
+    {
+        statistics.mean = ((n-1) * statistics.mean + newValue) / n;
+        
+        double delta = newValue - statistics.mean;
+        
+        statistics.variance = ((n-2) * statistics.variance + (n / (n - 1)) * delta * delta ) / (n - 1);
+    }
 }
             
 #endif
