@@ -307,7 +307,6 @@ TrackCartesianTrajectory::cleanup_and_send_result(const int &status,
                                                   const std::string &message,
                                                   const std::shared_ptr<ActionManager> actionManager)
 {
-
     publish_joint_command(Eigen::VectorXd::Zero(_numJoints));                                       // Ensure the last command is zero
             
     // Assign data to the result section of the actions
