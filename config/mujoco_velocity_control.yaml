@@ -1,4 +1,0 @@
-control_parameters:                     # NOTE: This must match the node name in the cpp file
-  ros__parameters:
-    kp: 50.0                            # Joint position gain
-    frequency: 500.0
