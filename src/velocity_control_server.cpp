@@ -5,11 +5,15 @@
  * @brief  This is testing & demonstration.
  */
 
-#include <RobotLibrary/SerialKinematicControl.h>                                                    // For serial link robots
 #include <ModelUpdater.h>                                                                           // Joint state subscriber
+#include <RobotLibrary/SerialKinematicControl.h>                                                    // For serial link robots
 #include <server/TrackCartesianTrajectory.h>
 #include <server/TrackJointTrajectory.h>
+#include "Utilities.h"
 
+  ////////////////////////////////////////////////////////////////////////////////////////////////////
+ //                                            MAIN                                                //
+////////////////////////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char **argv)
 {
     rclcpp::init(argc, argv);                                                                       // Launches ROS2
@@ -20,24 +24,26 @@ int main(int argc, char **argv)
 
         // Load all parameters at once
         std::string urdfLocation = paramNode->declare_parameter<std::string>("urdf", "");
-        double kp = paramNode->declare_parameter<double>("kp", 10.0);
         double frequency = paramNode->declare_parameter<double>("frequency", 500.0);
-        std::string endpointName = paramNode->declare_parameter<std::string>("endpoint", "unnamed");
+        std::string endpointName = paramNode->declare_parameter<std::string>("endpoint", "unnamed");  
         std::string controlTopicName = paramNode->declare_parameter<std::string>("control_topic", "joint_commands");
-
+       
         paramNode.reset();                                                                          // Free the node and its resources
 
         // Create model & controller
         RobotLibrary::KinematicTree robotModel(urdfLocation);                                       // Create the robot model
         RobotLibrary::SerialKinematicControl controller(&robotModel, endpointName, frequency);      // Create controller, attach model
-        controller.set_joint_gains(kp, 1.0);                                                        // Set control gains
         
+        if(not set_control_parameters(controller))
+        {
+            throw std::runtime_error("Failed to set control parameters for some reason.");
+        }
+          
         // Create nodes
         auto modelUpdaterNode = std::make_shared<ModelUpdater>(&robotModel);                        // Reads & updates joint state
         auto serverNode = std::make_shared<rclcpp::Node>(robotModel.name() + "_action_server");     // Create server node
 
-        // List actions, attach server node
-        
+        // List actions, attach server node      
         std::mutex mutex;                                                                           // Stops 2 actions using robot simultaneously
                
         TrackJointTrajectory jointTrajectoryServer(
