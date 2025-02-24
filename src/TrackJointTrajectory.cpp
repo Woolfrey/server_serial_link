@@ -58,16 +58,6 @@ TrackJointTrajectory::handle_goal(const rclcpp_action::GoalUUID &uuid,
                                   std::shared_ptr<const Action::Goal> goal)
 {
     (void)uuid;                                                                                     // Stops colcon from throwing a warning
-
-    // Ensure robot is not in use
-    if(not _padlock->try_lock())
-    {
-        RCLCPP_WARN(_node->get_logger(), "Request for joint trajectory tracking rejected. "
-                                         "Another action is using the robot.");
-                    
-                
-        return rclcpp_action::GoalResponse::REJECT;
-    }
     
     // Check tolerances
     if(goal->tolerances.size() != _numJoints)
@@ -124,6 +114,16 @@ TrackJointTrajectory::handle_goal(const rclcpp_action::GoalUUID &uuid,
         error.variance = 0.0;
         error.min = std::numeric_limits<double>::max();
         error.max = std::numeric_limits<double>::lowest();
+    }
+    
+    // Ensure robot is not in use
+    if(not _padlock->try_lock())
+    {
+        RCLCPP_WARN(_node->get_logger(), "Request for joint trajectory tracking rejected. "
+                                         "Another action is using the robot.");
+                    
+                
+        return rclcpp_action::GoalResponse::REJECT;
     }
 
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;                                         // Return success and continue to execution
