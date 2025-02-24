@@ -18,7 +18,9 @@
    <export>
      <build_type>ament_cmake</build_type>
    </export>
- 
+   
+    <!-- Default ROS2 packages -->
+  
    <depend>action_msgs</depend>
    <depend>geometry_msgs</depend>
    <depend>rclcpp</depend>
@@ -26,9 +28,9 @@
    <depend>sensor_msgs</depend>
    <depend>std_msgs</depend>
 
-    <!-- These are needed to generate custom .msg and .action files -->
-    <build_depend>rosidl_default_generators</build_depend>
-    <exec_depend>rosidl_default_runtime</exec_depend>
-    <member_of_group>rosidl_interface_packages</member_of_group>   
+    <!-- Other packages -->
+
+    <build_depend>serial_link_interfaces</build_depend>
+    <exec_depend>serial_link_interfaces</exec_depend>
    
 </package>
