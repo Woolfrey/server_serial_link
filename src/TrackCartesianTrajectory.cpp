@@ -35,7 +35,7 @@ TrackCartesianTrajectory::TrackCartesianTrajectory(std::shared_ptr<rclcpp::Node>
                                                         actionName,
                                                         controlTopicName)
 {
-    // Need to do something here
+    _feedback->header.frame_id = _controller->model()->base_name();
 }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////// 
@@ -46,16 +46,6 @@ TrackCartesianTrajectory::handle_goal(const rclcpp_action::GoalUUID &uuid,
                                       std::shared_ptr<const Action::Goal> goal)
 {
     (void)uuid;                                                                                     // Prevents colcon from throwing a warning
-
-    // Make sure no other action is using the robot
-    if(not _padlock->try_lock())
-    {
-        RCLCPP_WARN(_node->get_logger(),
-                    "Request for Cartesian trajectory tracking rejected. "
-                    "Another action is currently using the robot.");
-        
-        return rclcpp_action::GoalResponse::REJECT;
-    }
     
     // Ensure arguments are sound
     if(goal->position_tolerance <= 0.0
@@ -105,7 +95,7 @@ TrackCartesianTrajectory::handle_goal(const rclcpp_action::GoalUUID &uuid,
        // Check the frame of reference
             if(point.reference_frame == 0) poses.emplace_back(RobotLibrary::Model::Pose(translation,quaternion));// In base frame
        else if(point.reference_frame == 1) poses.emplace_back(poses.back()*RobotLibrary::Model::Pose(translation,quaternion)); // In current endpoint frame; transform to base
-       else if(point.reference_frame == 2)                                                                // Pose is relative to endpoint frame, but in base frame coordinates
+       else if(point.reference_frame == 2)                                                          // Pose is relative to endpoint frame, but in base frame coordinates
        {
             translation = poses.back().translation() + translation;                                 // Add the translation
             quaternion  = poses.back().quaternion()*quaternion;                                     // Add the rotation
@@ -121,6 +111,16 @@ TrackCartesianTrajectory::handle_goal(const rclcpp_action::GoalUUID &uuid,
     catch(const std::exception &exception)
     {
         RCLCPP_ERROR(_node->get_logger(), "Trajectory creation failed: %s", exception.what());
+        
+        return rclcpp_action::GoalResponse::REJECT;
+    }
+    
+    // Make sure no other action is using the robot
+    if(not _padlock->try_lock())
+    {
+        RCLCPP_WARN(_node->get_logger(),
+                    "Request for Cartesian trajectory tracking rejected. "
+                    "Another action is currently using the robot.");
         
         return rclcpp_action::GoalResponse::REJECT;
     }
@@ -153,13 +153,15 @@ TrackCartesianTrajectory::execute(const std::shared_ptr<GoalHandle> goalHandle)
             return;
         }
         
-        double elapsedTime = _node->get_clock()->now().seconds() - startTime;
+        double elapsedTime = _node->now().seconds() - startTime;
         
         if(elapsedTime > goal->points.back().time) break;    
         
          _controller->update();                                                                     // Update Jacobian etc.
          
-         const auto &[desiredPose, desiredVelocity, desiredAcceleration] = _trajectory.query_state(elapsedTime);
+         const auto &[desiredPose,
+                      desiredVelocity,
+                      desiredAcceleration] = _trajectory.query_state(elapsedTime);
          
         // Controller may throw a runtime error, so we need to catch it
         try
@@ -169,7 +171,7 @@ TrackCartesianTrajectory::execute(const std::shared_ptr<GoalHandle> goalHandle)
             publish_joint_command(jointCommands);                                                   // Send immediately to robot
             
             // Update feedback fields
-            RobotLibrary::Model::Pose actualPose = _controller->endpoint_pose();                           // Get computed pose
+            RobotLibrary::Model::Pose actualPose = _controller->endpoint_pose();                    // Get computed pose
             RL_pose_to_ROS(_feedback->actual.pose, actualPose);                                     // Convert from RobotLibrary object to ROS2 msg
             
             Eigen::Vector<double,6> twist = _controller->endpoint_velocity();                       // Get computed endpoint velocity
@@ -187,6 +189,8 @@ TrackCartesianTrajectory::execute(const std::shared_ptr<GoalHandle> goalHandle)
             _feedback->desired.accel.angular.z = desiredAcceleration[5];
             
             _feedback->manipulability = _controller->manipulability();
+            
+            _feedback->header.stamp = _node->now();
                   
             goalHandle->publish_feedback(_feedback);
             
