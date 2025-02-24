@@ -90,6 +90,9 @@ ActionServerBase<Action>::handle_cancel(const std::shared_ptr<GoalHandle> goalHa
         
         return rclcpp_action::CancelResponse::REJECT;
     }
+    
+    RCLCPP_WARN(_node->get_logger(), "Cancel request rejected: Goal is not active or already canceled.");
+    return rclcpp_action::CancelResponse::REJECT;
 }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
