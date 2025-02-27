@@ -40,7 +40,8 @@ ament_target_dependencies(joint_command_relay "ament_cmake"
 add_executable(trajectory_tracking_server src/trajectory_tracking_server.cpp
                                           src/ModelUpdater.cpp
                                           src/TrackCartesianTrajectory.cpp
-                                          src/TrackJointTrajectory.cpp)
+                                          src/TrackJointTrajectory.cpp
+                                          src/Utilities.cpp)
                                           
 target_link_libraries(trajectory_tracking_server Eigen3::Eigen RobotLibrary::RobotLibrary)
 
@@ -51,9 +52,26 @@ ament_target_dependencies(trajectory_tracking_server "ament_cmake"
                                                      "sensor_msgs"
                                                      "serial_link_interfaces"
                                                      "std_msgs")
-                                                                                  
+# Follow twist server
+add_executable(follow_twist_server src/follow_twist_server.cpp
+                                   src/FollowTwist.cpp
+                                   src/ModelUpdater.cpp
+                                   src/TrackJointTrajectory.cpp
+                                   src/Utilities.cpp)
+                                   
+target_link_libraries(follow_twist_server Eigen3::Eigen RobotLibrary::RobotLibrary)
+
+ament_target_dependencies(follow_twist_server "ament_cmake"
+                                              "geometry_msgs"
+                                              "rclcpp"
+                                              "rclcpp_action"
+                                              "sensor_msgs"
+                                              "serial_link_interfaces"
+                                              "std_msgs")
+
 # Installation
-install(TARGETS joint_command_relay
+install(TARGETS follow_twist_server
+                joint_command_relay
                 trajectory_tracking_server
         DESTINATION lib/${PROJECT_NAME}
 )
