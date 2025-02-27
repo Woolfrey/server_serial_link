@@ -17,14 +17,15 @@
  * @see https://github.com/Woolfrey/software_robot_library for more information on the control class.
  * @see https://docs.ros.org/en/humble/index.html for ROS 2 documentation.
  */
-#ifndef TRACKCARTESIANTRAJECTORY_H
-#define TRACKCARTESIANTRAJECTORY_H
+#ifndef TRACK_CARTESIAN_TRAJECTORY_H
+#define TRACK_CARTESIAN_TRAJECTORY_H
 
+#include <ActionServerBase.h>
 #include <geometry_msgs/msg/pose.hpp>
 #include <geometry_msgs/msg/twist.hpp>
 #include <RobotLibrary/Trajectory/CartesianSpline.h>                                                // Trajectory generator
-#include <ActionServerBase.h>
 #include <serial_link_interfaces/action/track_cartesian_trajectory.hpp>                             // Custom generated action
+#include <Utilities.h>
 
 /**
  * @brief This class performs joint trajectory tracking for a serial link robot arm.
@@ -93,28 +94,7 @@ class TrackCartesianTrajectory : public ActionServerBase<serial_link_interfaces:
          */
         void
         RL_pose_to_ROS(geometry_msgs::msg::Pose &feedbackPose,
-                       const RobotLibrary::Model::Pose &pose);
-        
-        /**
-         * @brief Puts an Eigen::Vector<double,6> object in to a ROS2 geometry_msgs/Twist
-         * @param feedbackTwist the ROS2 msg
-         * @param twist the Eigen::Vector object
-         */
-        void
-        Eigen_twist_to_ROS(geometry_msgs::msg::Twist &feedbackTwist,
-                           const Eigen::Vector<double, 6> &twist);
-         
-        /**
-         * @brief Recursively updates the performance statistics for the position and orientation error.
-         * @param statistics The custom msg for this package
-         * @param newValue The newly computed error norm
-         * @param n The sample size
-         */                  
-        void
-        update_statistics(serial_link_interfaces::msg::Statistics &statistics,
-                          const double &newValue,
-                          const unsigned int &n);
-        
+                       const RobotLibrary::Model::Pose &pose);  
 };                                                                                                  // Semicolon required after a class declaration
 
 #endif

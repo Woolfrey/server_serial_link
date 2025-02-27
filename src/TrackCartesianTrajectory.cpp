@@ -279,39 +279,3 @@ TrackCartesianTrajectory::RL_pose_to_ROS(geometry_msgs::msg::Pose &feedbackPose,
     feedbackPose.orientation.y = pose.quaternion().y();
     feedbackPose.orientation.z = pose.quaternion().z();
 }
-  
-  ////////////////////////////////////////////////////////////////////////////////////////////////////
- //              Puts an Eigen::Vector<double,6> object in to a ROS2 geometry_msgs/Twist           //
-////////////////////////////////////////////////////////////////////////////////////////////////////
-void
-TrackCartesianTrajectory::Eigen_twist_to_ROS(geometry_msgs::msg::Twist &feedbackTwist,
-                                             const Eigen::Vector<double, 6> &twist)
-{
-    feedbackTwist.linear.x  = twist[0];
-    feedbackTwist.linear.y  = twist[1];
-    feedbackTwist.linear.z  = twist[2];
-    feedbackTwist.angular.x = twist[3];
-    feedbackTwist.angular.y = twist[4];
-    feedbackTwist.angular.z = twist[5];
-}
-
-  ////////////////////////////////////////////////////////////////////////////////////////////////////
- //                     Updates min & max, and the mean and variance recursively                   //
-////////////////////////////////////////////////////////////////////////////////////////////////////
-void
-TrackCartesianTrajectory::update_statistics(serial_link_interfaces::msg::Statistics &statistics,
-                                            const double &newValue,
-                                            const unsigned int &n)
-{
-    statistics.min = std::min(statistics.min, newValue);
-    statistics.max = std::max(statistics.max, newValue);
-    
-    if(n > 1)
-    {
-        statistics.mean = ((n-1) * statistics.mean + newValue) / n;
-        
-        double delta = newValue - statistics.mean;
-        
-        statistics.variance = ((n-2) * statistics.variance + (n / (n - 1)) * delta * delta ) / (n - 1);
-    }
-}
