@@ -16,7 +16,14 @@
  * @see https://docs.ros.org/en/humble/index.html for ROS 2 documentation.
  */
  
+#ifndef UTILITIES_H
+#define UTILITIES_H
+ 
+#include <Eigen/Core>
+#include <geometry_msgs/msg/twist.hpp>
 #include <RobotLibrary/Control/SerialLinkBase.h>
+#include <rclcpp/rclcpp.hpp>
+#include <serial_link_interfaces/msg/statistics.hpp>
 
 /**
  * @brief Set control parameters for the action server.
@@ -24,54 +31,26 @@
  * @return Returns false if at least one parameter cannot be set.
  */
 bool
-set_control_parameters(RobotLibrary::Control::SerialLinkBase &controller)
-{
-    auto configNode = rclcpp::Node::make_shared("control_parameters");
+set_control_parameters(RobotLibrary::Control::SerialLinkBase &controller);
 
-    // Load Cartesian damping matrix
-    configNode->declare_parameter<std::vector<double>>("cartesian_damping", {}, rcl_interfaces::msg::ParameterDescriptor{});
-    std::vector<double> damping = configNode->get_parameter("cartesian_damping").as_double_array();
+/**
+ * @brief Updates min & max, and the mean and variance recursively
+ * @param statistics A custom message that contains statistical data field
+ * @param newValue The new computed value to use for the update
+ * @param n The current sample size.
+ */
+void
+update_statistics(serial_link_interfaces::msg::Statistics &statistics,
+                  const double &newValue,
+                  const unsigned int &n);
 
-    if (damping.size() != 36)
-    {
-        RCLCPP_ERROR(configNode->get_logger(), "Cartesian damping must have exactly 36 elements.");
-        return false;
-    }
+/**
+ * @brief Puts an Eigen::Vector<double,6> object in to a ROS2 geometry_msgs/Twist
+ * @param feedbackTwist The ROS2 object to put the data in to.
+ * @param twist The Eigen::Vector object with the data we need.
+ */
+void
+Eigen_twist_to_ROS(geometry_msgs::msg::Twist &feedbackTwist,
+                   const Eigen::Vector<double, 6> &twist);
 
-    Eigen::Matrix<double, 6, 6> cartesianDamping;
-    for (int i = 0; i < 6; ++i)
-    {
-        for (int j = 0; j < 6; ++j) {
-            cartesianDamping(i, j) = damping[i * 6 + j];
-        }
-    }
-
-    // Load Cartesian stiffness matrix
-    configNode->declare_parameter<std::vector<double>>("cartesian_stiffness", {}, rcl_interfaces::msg::ParameterDescriptor{});
-    std::vector<double> stiffness = configNode->get_parameter("cartesian_stiffness").as_double_array();
-
-    if (stiffness.size() != 36) {
-        RCLCPP_ERROR(configNode->get_logger(), "Cartesian stiffness must have exactly 36 elements.");
-        return false;
-    }
-
-    Eigen::Matrix<double, 6, 6> cartesianStiffness;
-    for (int i = 0; i < 6; ++i) {
-        for (int j = 0; j < 6; ++j) {
-            cartesianStiffness(i, j) = stiffness[i * 6 + j];
-        }
-    }
-
-    // Load scalar parameters
-    double jointPositionGain = configNode->declare_parameter<double>("joint_position_gain", 50.0, rcl_interfaces::msg::ParameterDescriptor{});
-    double jointVelocityGain = configNode->declare_parameter<double>("joint_velocity_gain", 1.0, rcl_interfaces::msg::ParameterDescriptor{});
-    double manipulabilityThreshold = configNode->declare_parameter<double>("manipulability_threshold", 0.001, rcl_interfaces::msg::ParameterDescriptor{});
-
-    // Set control parameters in the controller
-    controller.set_cartesian_gains(cartesianStiffness, cartesianDamping);
-    controller.set_joint_gains(jointPositionGain, jointVelocityGain);
-    controller.set_manipulability_threshold(manipulabilityThreshold);
-
-    RCLCPP_INFO(configNode->get_logger(), "Control parameters successfully loaded and set.");
-    return true;
-}
+#endif
