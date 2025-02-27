@@ -18,8 +18,8 @@
  * @see https://docs.ros.org/en/humble/index.html for ROS 2 documentation.
  */
 
-#ifndef ACTIONSERVER_BASE_H
-#define ACTIONSERVER_BASE_H
+#ifndef ACTION_SERVER_BASE_H
+#define ACTION_SERVER_BASE_H
 
 #include <mutex>
 #include <rclcpp/rclcpp.hpp>                                                                        // ROS2 C++ libraries
