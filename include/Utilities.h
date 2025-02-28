@@ -30,8 +30,8 @@
  * @param controller A RobotLibrary::SerialLinkBase class (or derivative).
  * @return Returns false if at least one parameter cannot be set.
  */
-bool
-set_control_parameters(RobotLibrary::Control::SerialLinkBase &controller);
+RobotLibrary::Control::Options
+get_control_parameters(const std::shared_ptr<rclcpp::Node> &node);
 
 /**
  * @brief Updates min & max, and the mean and variance recursively

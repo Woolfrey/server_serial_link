@@ -48,8 +48,8 @@ class ActionServerBase
          * @param controlTopicName The name of the topic for publishing joint commands
          */
         ActionServerBase(std::shared_ptr<rclcpp::Node> node,
-                         RobotLibrary::Control::SerialLinkBase *controller,
-                         std::mutex *padlock,
+                         std::share_ptr<RobotLibrary::Control::SerialLinkBase> controller,
+                         std::shared_ptr<std::mutex> mutex,
                          const std::string &actionName = "you_forgot_to_name_me_you_rube",
                          const std::string &controlTopicName = "joint_commands");
     
@@ -65,13 +65,13 @@ class ActionServerBase
 
         std::shared_ptr<typename Action::Feedback> _feedback = std::make_shared<typename Action::Feedback>(); ///< Use this to store feedback
         
-        RobotLibrary::Control::SerialLinkBase* _controller;                                         ///< Pointer to the controller
+        std::shared_ptr<RobotLibrary::Control::SerialLinkBase> _controller;                         ///< Pointer to the controller
         
         JointCommandMsg _jointCommand;                                                              ///< Stores information
         
         rclcpp::Publisher<JointCommandMsg>::SharedPtr _jointCommandPublisher;                       ///< Makes commands public on ROS2
 
-        std::mutex* _padlock;                                                                       ///< Used to prevent 2 actions controlling the robot simultaneously
+        std::shared_ptr<std::mutex> _mutex;                                                         ///< Used to prevent 2 actions controlling the robot simultaneously
         
         /**
          * @brief Processes the request to execute action.

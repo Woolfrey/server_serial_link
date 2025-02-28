@@ -22,57 +22,52 @@
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                            Set the control gains and other parameters                          //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-bool
-set_control_parameters(RobotLibrary::Control::SerialLinkBase &controller)
+RobotLibrary::Control::Options
+get_control_parameters(const std::shared_ptr<rclcpp::Node> &node)
 {
-    auto configNode = rclcpp::Node::make_shared("control_parameters");
+    RobotLibrary::Control::Options options;                                                         // We want to return this
+    
+    // We need to declare all the parameters before we can get them.
+    node->declare_parameter<std::vector<double>>("cartesian_damping", {});                          // Gain on endpoint velocity error
+    node->declare_parameter<std::vector<double>>("cartesian_stiffness", {});                        // Gain on endpoint pose error
+    node->declare_parameter<double>("joint_position_gain", 50.0);                                   // Gain on joint position error
+    node->declare_parameter<double>("joint_velocity_gain", 1.0);                                    // Gain on joint velocity error
+    node->declare_parameter<double>("manipulability_threshold", 1e-03);                             // For singularity avoidance
+    node->declare_parameter<double>("solver_intial_barrier", 100);                                  // Initial scalar for log barrier function in QP solver
+    node->declare_parameter<double>("solver_reduction_rate", 1e-02);                                // Multiplier for log barrier in QP solver
+    node->declare_parameter<int>("max_steps", 5);                                                   // Maximum iterations for the solver algorithm 
 
-    // Load Cartesian damping matrix
-    configNode->declare_parameter<std::vector<double>>("cartesian_damping", {}, rcl_interfaces::msg::ParameterDescriptor{});
-    std::vector<double> damping = configNode->get_parameter("cartesian_damping").as_double_array();
-
-    if (damping.size() != 36)
+    std::vector<double> temp;                                                                       // Temporary storage
+    
+    // Get & store damping
+    temp = node->get_parameter("cartesian_damping").as_double_array();
+    
+    if(temp.size() != 36)
     {
-        RCLCPP_ERROR(configNode->get_logger(), "Cartesian damping must have exactly 36 elements.");
-        return false;
+        throw std::invalid_argument("Cartesian damping must have exactly 36 elements, but had " + std::to_string(temp.size()) + ".");
     }
-
-    Eigen::Matrix<double, 6, 6> cartesianDamping;
-    for (int i = 0; i < 6; ++i)
+    
+    for(int i = 0; i < 6; ++i) for(int j = 0; j < 6; ++j) options.cartesianDamping(i,j) = temp[i*6+j];
+    
+    // Get & store stiffness
+    temp = node->get_parameter("cartesian_stiffness").as_double_array();
+    
+    if(temp.size() != 36)
     {
-        for (int j = 0; j < 6; ++j) {
-            cartesianDamping(i, j) = damping[i * 6 + j];
-        }
+        throw std::invalid_argument("Cartesian stiffness must have exactly 36 elements, but had " + std::to_string(temp.size()) + ".");
     }
-
-    // Load Cartesian stiffness matrix
-    configNode->declare_parameter<std::vector<double>>("cartesian_stiffness", {}, rcl_interfaces::msg::ParameterDescriptor{});
-    std::vector<double> stiffness = configNode->get_parameter("cartesian_stiffness").as_double_array();
-
-    if (stiffness.size() != 36) {
-        RCLCPP_ERROR(configNode->get_logger(), "Cartesian stiffness must have exactly 36 elements.");
-        return false;
-    }
-
-    Eigen::Matrix<double, 6, 6> cartesianStiffness;
-    for (int i = 0; i < 6; ++i) {
-        for (int j = 0; j < 6; ++j) {
-            cartesianStiffness(i, j) = stiffness[i * 6 + j];
-        }
-    }
-
-    // Load scalar parameters
-    double jointPositionGain = configNode->declare_parameter<double>("joint_position_gain", 50.0, rcl_interfaces::msg::ParameterDescriptor{});
-    double jointVelocityGain = configNode->declare_parameter<double>("joint_velocity_gain", 1.0, rcl_interfaces::msg::ParameterDescriptor{});
-    double manipulabilityThreshold = configNode->declare_parameter<double>("manipulability_threshold", 0.001, rcl_interfaces::msg::ParameterDescriptor{});
-
-    // Set control parameters in the controller
-    controller.set_cartesian_gains(cartesianStiffness, cartesianDamping);
-    controller.set_joint_gains(jointPositionGain, jointVelocityGain);
-    controller.set_manipulability_threshold(manipulabilityThreshold);
-
-    RCLCPP_INFO(configNode->get_logger(), "Control parameters successfully loaded and set.");
-    return true;
+    
+    for(int i = 0; i < 6; ++i) for(int j = 0; j < 6; ++j) options.cartesianStiffness(i,j) = temp[i*6+j];
+   
+    // Load other parameters
+    options.jointPositionGain = node->get_parameter("joint_position_gain").as_double();
+    options.jointVelocityGain = node->get_parameter("joint_velocity_gain").as_double();
+    options.minManipulability = node->get_parameter("manipulability_threshold").as_double();
+    options.qpsolver.initialBarrierScalar = node->get_parameter("solver_initial_barrier").as_double();
+    options.qpsolver.barrierReductioNRate = node->get_parameter("solver_reduction_rate").as_double();
+    options.qpsolver.maxSteps = node->get_parameter("max_steps").as_int();
+   
+    return options;
 }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
