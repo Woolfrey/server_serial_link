@@ -31,50 +31,42 @@
 int main(int argc, char **argv)
 {
     rclcpp::init(argc, argv);                                                                       // Launches ROS2
-
+    
+    // Load parameters (NOTE TO SELF: Need to clean this up!)
+    auto paramNode = std::make_shared<rclcpp::Node>("param_loader");
+    std::string urdfLocation = paramNode->declare_parameter<std::string>("urdf", "");
+    std::string endpointName = paramNode->declare_parameter<std::string>("endpoint", "unnamed");  
+    std::string controlTopicName = paramNode->declare_parameter<std::string>("control_topic", "joint_commands");
+    paramNode.reset();                                                                              // Free the node and its resources
+    
     try
     {
-        auto paramNode = std::make_shared<rclcpp::Node>("param_loader");                            // Temporary node to load parameters
+        auto model = std::make_shared<RobotLibrary::Model::KinematicTree>(urdfLocation);            // Create the model
 
-        // Load all parameters at once
-        // NOTE TO SELF: This can be improved in future
-        std::string urdfLocation = paramNode->declare_parameter<std::string>("urdf", "");
-        double frequency = paramNode->declare_parameter<double>("frequency", 500.0);
-        std::string endpointName = paramNode->declare_parameter<std::string>("endpoint", "unnamed");  
-        std::string controlTopicName = paramNode->declare_parameter<std::string>("control_topic", "joint_commands");
-       
-        paramNode.reset();                                                                          // Free the node and its resources
-
-        // Create model & controller
-        RobotLibrary::Model::KinematicTree robotModel(urdfLocation);                                // Create the robot model
-        RobotLibrary::Control::SerialKinematicControl controller(&robotModel, endpointName, frequency); // Create controller, attach model
+        auto modelUpdaterNode = std::make_shared<ModelUpdater>(model);                                
         
-        if(not set_control_parameters(controller))
-        {
-            throw std::runtime_error("Failed to set control parameters for some reason.");
-        }
-          
-        // Create nodes
-        auto modelUpdaterNode = std::make_shared<ModelUpdater>(&robotModel);                        // Reads & updates joint state
-        auto serverNode = std::make_shared<rclcpp::Node>(robotModel.name() + "_action_server");     // Create server node
+        auto serverNode = std::make_shared<rclcpp::Node>(model->name()+"_action_server");            // Create the server node
+        
+        auto controller = std::make_shared<RobotLibrary::Control::SerialKinematicControl>(model,
+                                                                                          endpointName,
+                                                                                          get_control_parameters(serverNode));
 
+        auto mutex = std::make_shared<std::mutex>();                                               
+        
         // List actions, attach server node      
-        std::mutex mutex;                                                                           // Stops 2 actions using robot simultaneously
                
-        TrackJointTrajectory jointTrajectoryServer(
-            serverNode,
-            &controller,
-            &mutex,
-            "track_joint_trajectory",
-            "joint_command_relay");
+        TrackJointTrajectory jointTrajectoryServer(serverNode,
+                                                   controller,
+                                                   mutex,
+                                                   "track_joint_trajectory",
+                                                   "joint_command_relay");
                                                    
-        FollowTwist followTwistServer(
-            serverNode,
-            &controller,
-            &mutex,
-            "follow_twist",
-            "joint_command_relay",
-            "twist_command");
+        FollowTwist followTwistServer(serverNode,
+                                      controller,
+                                      mutex,
+                                      "follow_twist",
+                                      "joint_command_relay",
+                                      "twist_command");
 
         // Add nodes to executor & spin
         rclcpp::executors::MultiThreadedExecutor executor;

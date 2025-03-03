@@ -48,7 +48,7 @@ class ActionServerBase
          * @param controlTopicName The name of the topic for publishing joint commands
          */
         ActionServerBase(std::shared_ptr<rclcpp::Node> node,
-                         std::share_ptr<RobotLibrary::Control::SerialLinkBase> controller,
+                         std::shared_ptr<RobotLibrary::Control::SerialLinkBase> controller,
                          std::shared_ptr<std::mutex> mutex,
                          const std::string &actionName = "you_forgot_to_name_me_you_rube",
                          const std::string &controlTopicName = "joint_commands");

@@ -36,12 +36,12 @@ class ModelUpdater : public rclcpp::Node
          * @param model A pointer to the kinematic/dynamic model of the robot.
          * @param topicName The name of the joint state topic to subscribe to.
          */
-        ModelUpdater(RobotLibrary::Model::KinematicTree *model,
+        ModelUpdater(std::shared_ptr<RobotLibrary::Model::KinematicTree> model,
                      const std::string &topicName = "joint_states");
         
     private:
 
-        RobotLibrary::Model::KinematicTree *_model;                                                 ///< Pointer to robot model.
+        std::shared_ptr<RobotLibrary::Model::KinematicTree> _model;                                 ///< Pointer to robot model.
         
         std::string _topicName = "joint_states";                                                    ///< Name of joint state topic to subscribe to
         

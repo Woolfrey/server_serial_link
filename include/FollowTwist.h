@@ -41,15 +41,15 @@ class FollowTwist : public ActionServerBase<serial_link_interfaces::action::Foll
         /**
          * @brief Constructor for the class.
          * @param node A (shared) pointer to a ROS2 node
-         * @param controller A raw pointer to a RobotLibrary controller
-         * @param padlock A raw pointer to a mutex for blocking other actions
+         * @param controller A shared pointer to a RobotLibrary controller
+         * @param mutex A shared pointer to a mutex for blocking other actions
          * @param actionName What this action will be listed as on the ROS2 network
          * @param controlTopicName The name to which joint control outputs are published.
          * @param twistTopicName The name to subscribe to for input commands.
          */
         FollowTwist(std::shared_ptr<rclcpp::Node> node,
-                    RobotLibrary::Control::SerialLinkBase *controller,
-                    std::mutex *padlock,
+                    std::shared_ptr<RobotLibrary::Control::SerialLinkBase> controller,
+                    std::shared_ptr<std::mutex> mutex,
                     const std::string &actionName = "track_cartesian_trajectory",
                     const std::string &controlTopicName = "joint_commands",
                     const std::string &twistTopicName = "twist_command");

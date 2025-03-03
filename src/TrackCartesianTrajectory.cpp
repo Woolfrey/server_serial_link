@@ -24,14 +24,14 @@
  //                                         Constructor                                            //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 TrackCartesianTrajectory::TrackCartesianTrajectory(std::shared_ptr<rclcpp::Node> node,
-                                                   RobotLibrary::Control::SerialLinkBase *controller,
-                                                   std::mutex *padlock,
+                                                   std::shared_ptr<RobotLibrary::Control::SerialLinkBase> controller,
+                                                   std::shared_ptr<std::mutex> mutex,
                                                    const std::string &actionName,
                                                    const std::string &controlTopicName)
                                                    : ActionServerBase(
                                                         node,
                                                         controller,
-                                                        padlock,
+                                                        mutex,
                                                         actionName,
                                                         controlTopicName)
 {
@@ -116,7 +116,7 @@ TrackCartesianTrajectory::handle_goal(const rclcpp_action::GoalUUID &uuid,
     }
     
     // Make sure no other action is using the robot
-    if(not _padlock->try_lock())
+    if(not _mutex->try_lock())
     {
         RCLCPP_WARN(_node->get_logger(),
                     "Request for Cartesian trajectory tracking rejected. "
@@ -261,7 +261,7 @@ TrackCartesianTrajectory::cleanup_and_send_result(const int &status,
         }
     }
 
-    _padlock->unlock();                                                                             // Release control
+    _mutex->unlock();                                                                             // Release control
 }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -28,12 +28,12 @@ get_control_parameters(const std::shared_ptr<rclcpp::Node> &node)
     RobotLibrary::Control::Options options;                                                         // We want to return this
     
     // We need to declare all the parameters before we can get them.
-    node->declare_parameter<std::vector<double>>("cartesian_damping", {});                          // Gain on endpoint velocity error
-    node->declare_parameter<std::vector<double>>("cartesian_stiffness", {});                        // Gain on endpoint pose error
+    node->declare_parameter("cartesian_damping", std::vector<double>());                            // Gain on endpoint velocity error
+    node->declare_parameter("cartesian_stiffness", std::vector<double>());                          // Gain on endpoint pose error
     node->declare_parameter<double>("joint_position_gain", 50.0);                                   // Gain on joint position error
     node->declare_parameter<double>("joint_velocity_gain", 1.0);                                    // Gain on joint velocity error
     node->declare_parameter<double>("manipulability_threshold", 1e-03);                             // For singularity avoidance
-    node->declare_parameter<double>("solver_intial_barrier", 100);                                  // Initial scalar for log barrier function in QP solver
+    node->declare_parameter<double>("solver_initial_barrier", 100.0);                               // Initial scalar for log barrier function in QP solver
     node->declare_parameter<double>("solver_reduction_rate", 1e-02);                                // Multiplier for log barrier in QP solver
     node->declare_parameter<int>("max_steps", 5);                                                   // Maximum iterations for the solver algorithm 
 
@@ -64,7 +64,7 @@ get_control_parameters(const std::shared_ptr<rclcpp::Node> &node)
     options.jointVelocityGain = node->get_parameter("joint_velocity_gain").as_double();
     options.minManipulability = node->get_parameter("manipulability_threshold").as_double();
     options.qpsolver.initialBarrierScalar = node->get_parameter("solver_initial_barrier").as_double();
-    options.qpsolver.barrierReductioNRate = node->get_parameter("solver_reduction_rate").as_double();
+    options.qpsolver.barrierReductionRate = node->get_parameter("solver_reduction_rate").as_double();
     options.qpsolver.maxSteps = node->get_parameter("max_steps").as_int();
    
     return options;

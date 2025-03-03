@@ -23,7 +23,7 @@
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                                          Constructor                                           //     
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-ModelUpdater::ModelUpdater(RobotLibrary::Model::KinematicTree *model,
+ModelUpdater::ModelUpdater(std::shared_ptr<RobotLibrary::Model::KinematicTree> model,
                            const std::string &topicName)
                            : Node(model->name() + "_model_updater"),
                              _model(model),

@@ -45,8 +45,8 @@ class TrackJointTrajectory : public ActionServerBase<serial_link_interfaces::act
          * @param options I have no idea what this does ¯\_(ツ)_/¯
          */
         TrackJointTrajectory(std::shared_ptr<rclcpp::Node> node,
-                             RobotLibrary::Control::SerialLinkBase *controller,
-                             std::mutex* padlock,
+                             std::shared_ptr<RobotLibrary::Control::SerialLinkBase> controller,
+                             std::shared_ptr<std::mutex> mutex,
                              const std::string &actionName = "track_joint_trajectory",
                              const std::string &controlTopicName = "joint_commands");
     

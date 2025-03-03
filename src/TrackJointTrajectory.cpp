@@ -24,15 +24,15 @@
  //                                            Constructor                                         //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 TrackJointTrajectory::TrackJointTrajectory(std::shared_ptr<rclcpp::Node> node,
-                                           RobotLibrary::Control::SerialLinkBase *controller,
-                                           std::mutex *padlock,
+                                           std::shared_ptr<RobotLibrary::Control::SerialLinkBase> controller,
+                                           std::shared_ptr<std::mutex> mutex,
                                            const std::string &actionName,
                                            const std::string &controlTopicName)
                                            : ActionServerBase
                                              (
                                                 node,
                                                 controller,
-                                                padlock,
+                                                mutex,
                                                 actionName,
                                                 controlTopicName
                                              )
@@ -117,7 +117,7 @@ TrackJointTrajectory::handle_goal(const rclcpp_action::GoalUUID &uuid,
     }
     
     // Ensure robot is not in use
-    if(not _padlock->try_lock())
+    if(not _mutex->try_lock())
     {
         RCLCPP_WARN(_node->get_logger(), "Request for joint trajectory tracking rejected. "
                                          "Another action is using the robot.");
@@ -250,5 +250,5 @@ TrackJointTrajectory::cleanup_and_send_result(const int &status,
         RCLCPP_INFO(_node->get_logger(), "Joint trajectory tracking aborted.");
     }
 
-    _padlock->unlock();                                                                             // Release control in all cases
+    _mutex->unlock();                                                                             // Release control in all cases
 }

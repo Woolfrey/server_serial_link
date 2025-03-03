@@ -24,14 +24,14 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 template <class Action>
 ActionServerBase<Action>::ActionServerBase(std::shared_ptr<rclcpp::Node> node,
-                                           RobotLibrary::Control::SerialLinkBase *controller,
-                                           std::mutex *padlock,
+                                           std::shared_ptr<RobotLibrary::Control::SerialLinkBase> controller,
+                                           std::shared_ptr<std::mutex> mutex,
                                            const std::string &actionName,
                                            const std::string &controlTopicName)
                                            : _node(node),
                                              _numJoints(controller->model()->number_of_joints()),
                                              _controller(controller),
-                                             _padlock(padlock)
+                                             _mutex(mutex)
 {
     using namespace std::placeholders;                                                              // For brevity
 

@@ -29,13 +29,13 @@ int main(int argc, char **argv)
     {
         auto model = std::make_shared<RobotLibrary::Model::KinematicTree>(urdfLocation);            // Create the model
 
-        auto modelUpdateNode = std::make_shared<ModelUpdate>(model);                                
+        auto modelUpdaterNode = std::make_shared<ModelUpdater>(model);                                
         
-        auto serverNode = std::make_shared<rclcpp::Node>(robotModel.name()+"_action_server");       // Create the server node
+        auto serverNode = std::make_shared<rclcpp::Node>(model->name()+"_action_server");            // Create the server node
         
         auto controller = std::make_shared<RobotLibrary::Control::SerialKinematicControl>(model,
                                                                                           endpointName,
-                                                                                          get_control_options(serverNode));
+                                                                                          get_control_parameters(serverNode));
 
         auto mutex = std::make_shared<std::mutex>();                                               
         
