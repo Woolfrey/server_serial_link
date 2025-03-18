@@ -21,17 +21,8 @@
  
 #include <Eigen/Core>
 #include <geometry_msgs/msg/twist.hpp>
-#include <RobotLibrary/Control/SerialLinkBase.h>
 #include <rclcpp/rclcpp.hpp>
 #include <serial_link_interfaces/msg/statistics.hpp>
-
-/**
- * @brief Set control parameters for the action server.
- * @param controller A RobotLibrary::SerialLinkBase class (or derivative).
- * @return Returns false if at least one parameter cannot be set.
- */
-RobotLibrary::Control::Options
-get_control_parameters(const std::shared_ptr<rclcpp::Node> &node);
 
 /**
  * @brief Updates min & max, and the mean and variance recursively

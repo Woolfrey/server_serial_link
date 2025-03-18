@@ -87,8 +87,27 @@ class JointCommandRelay : public rclcpp::Node
 int main(int argc, char *argv[])
 {
     rclcpp::init(argc, argv);                                                                       // Start up ROS2
-    rclcpp::spin(std::make_shared<JointCommandRelay>());                                            // Run the node
-    rclcpp::shutdown();                                                                             // As it says
-    return 0;
+    
+    unsigned int returnCode = 0;
+    
+    if(argc < 3)
+    {
+        RCLCPP_ERROR(rclcpp::get_logger("main"), "Invalid number of arguments. Usage: <executable> <node_name> <subscription_name> <publication_name>");
+        
+        returnCode = 1;
+    }
+    else
+    {
+        // This is just for clarity:
+        std::string nodeName         = argv[1];
+        std::string subscriptionName = argv[2];
+        std::string publicationName  = argv[3];
+        
+        rclcpp::spin(std::make_shared<JointCommandRelay>(nodeName, subscriptionName, publicationName)); // Create & run node
+    }
+    
+    rclcpp::shutdown();
+    
+    return returnCode;
 }
 
