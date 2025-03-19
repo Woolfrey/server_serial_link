@@ -28,11 +28,27 @@ ActionServerBase<Action>::ActionServerBase(std::shared_ptr<rclcpp::Node> node,
                                            std::shared_ptr<std::mutex> mutex,
                                            const std::string &actionName,
                                            const std::string &controlTopicName)
-                                           : _node(node),
-                                             _numJoints(controller->model()->number_of_joints()),
-                                             _controller(controller),
-                                             _mutex(mutex)
+:   _node(node),
+    _numJoints(controller->model()->number_of_joints()),
+    _controller(controller),
+    _mutex(mutex)
 {
+    // Ensure there are no null pointers
+    if(not node)
+    {
+        throw std::invalid_argument("[ERROR] [ACTION SERVER BASE] Constructor: Node argument is a null pointer.");
+    }
+    
+    if(not controller)
+    {
+        throw std::invalid_argument("[ERROR] [ACTION SERVER BASE] Constructor: Controller argument is a null pointer.");
+    }
+    
+    if(not mutex)
+    {
+        throw std::invalid_argument("[ERROR] [ACTION SERVER BASE] Constructor: Mutex argument is a null pointer.");
+    }
+       
     using namespace std::placeholders;                                                              // For brevity
 
     // Initialise the action server, link methods
