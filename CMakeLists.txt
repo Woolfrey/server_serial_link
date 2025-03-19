@@ -28,14 +28,6 @@ include_directories(include
                     ${EIGEN3_INCLUDE_DIRS}
                     ${RobotLibrary_INCLUDE_DIRS})
 
-# Joint command relay
-add_executable(joint_command_relay src/joint_command_relay.cpp)
-
-ament_target_dependencies(joint_command_relay "ament_cmake"
-                                              "rclcpp"
-                                              "serial_link_interfaces"
-                                              "std_msgs")
-                                              
 # Trajectory tracking server
 add_executable(trajectory_tracking_server src/trajectory_tracking_server.cpp
                                           src/ModelUpdater.cpp
@@ -53,15 +45,8 @@ ament_target_dependencies(trajectory_tracking_server "ament_cmake"
                                                      "serial_link_interfaces"
                                                      "std_msgs")
 # Installation
-install(TARGETS joint_command_relay
-                trajectory_tracking_server
+install(TARGETS trajectory_tracking_server
         DESTINATION lib/${PROJECT_NAME}
-)
-
-install(DIRECTORY launch
-                  config
-                  urdf
-        DESTINATION share/${PROJECT_NAME}
 )
 
 ament_package()
