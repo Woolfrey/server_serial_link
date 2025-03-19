@@ -22,7 +22,24 @@
 #include <Eigen/Core>
 #include <geometry_msgs/msg/twist.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <RobotLibrary/Control/SerialLinkBase.h>
 #include <serial_link_interfaces/msg/statistics.hpp>
+
+/**
+ * @brief Converts a std::vector object (with 36 elements) to a 6x6 Eigen::Matrix object.
+ * @param vector The vector to be converted.
+ * @return An Eigen::Matrix object with pre-defined dimensions.
+ */
+Eigen::Matrix<double,6,6>
+vector_to_matrix(const std::vector<double> vector);
+
+/**
+ * @brief Loads parameters from ROS2 server and put them in to a RobotLibrary struct for a controller class.
+ * @param node A ROS2 node class is required to retrieve parameters.
+ * @return A custom struct which is used by the RobotLibrary::Control::SerialLinkBase class(es).
+ */
+RobotLibrary::Control::Parameters
+load_control_parameters(const std::shared_ptr<rclcpp::Node> &node);
 
 /**
  * @brief Updates min & max, and the mean and variance recursively
