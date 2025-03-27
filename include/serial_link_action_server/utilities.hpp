@@ -1,5 +1,5 @@
 /**
- * @file    Utilities.h
+ * @file    utilities.hpp
  * @author  Jon Woolfrey
  * @email   jonathan.woolfrey@gmail.com
  * @date    February 2025
@@ -24,6 +24,8 @@
 #include <rclcpp/rclcpp.hpp>
 #include <RobotLibrary/Control/SerialLinkBase.h>
 #include <serial_link_interfaces/msg/statistics.hpp>
+
+namespace serial_link_action_server {
 
 /**
  * @brief Converts a std::vector object (with 36 elements) to a 6x6 Eigen::Matrix object.
@@ -60,5 +62,7 @@ update_statistics(serial_link_interfaces::msg::Statistics &statistics,
 void
 Eigen_twist_to_ROS(geometry_msgs::msg::Twist &feedbackTwist,
                    const Eigen::Vector<double, 6> &twist);
+
+}
 
 #endif

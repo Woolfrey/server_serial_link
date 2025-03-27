@@ -1,5 +1,5 @@
 /**
- * @file    ActionServerBase.h
+ * @file    action_server_base.hpp
  * @author  Jon Woolfrey
  * @email   jonathan.woolfrey@gmail.com
  * @date    February 2025
@@ -27,6 +27,8 @@
 #include <RobotLibrary/Control/SerialLinkBase.h>                                                    // Controller
 #include <serial_link_interfaces/msg/joint_command.hpp>                                             // Custom message
 #include <thread>
+
+namespace serial_link_action_server {
 
 /**
  * @brief This is a base class to standardise actions for control of serial link robots.
@@ -120,6 +122,8 @@ class ActionServerBase
         
 };                                                                                                  // Semicolon required after a class declaration
 
-#include <ActionServerBase.tpp>                                                                     // Source files
+}
+
+#include <serial_link_action_server/action_server_base.tpp>                                         // Source files
 
 #endif

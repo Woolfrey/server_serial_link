@@ -1,5 +1,5 @@
 /**
- * @file    ActionServerBase.tpp
+ * @file    action_server_base.tpp
  * @author  Jon Woolfrey
  * @email   jonathan.woolfrey@gmail.com
  * @date    February 2025
@@ -17,7 +17,9 @@
  * @see https://docs.ros.org/en/humble/index.html for ROS 2 documentation.
  */
  
-#include <ActionServerBase.h>
+#include <serial_link_action_server/action_server_base.hpp>
+
+namespace serial_link_action_server {
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                                          Constructor                                           //
@@ -125,3 +127,4 @@ ActionServerBase<Action>::publish_joint_command(const Eigen::VectorXd &command)
     _jointCommandPublisher->publish(_jointCommand);                                                 // Publish control topic
 }
 
+}

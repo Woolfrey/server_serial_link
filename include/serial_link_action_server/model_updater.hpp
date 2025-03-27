@@ -1,5 +1,5 @@
 /**
- * @file    ModelUpdater.h
+ * @file    model_updater.hpp
  * @author  Jon Woolfrey
  * @email   jonathan.woolfrey@gmail.com
  * @date    February 2025
@@ -23,6 +23,8 @@
 #include <RobotLibrary/Model/KinematicTree.h>
 
 using JointState = sensor_msgs::msg::JointState;                                                    // For brevity
+
+namespace serial_link_action_server {
 
 /**
  * @brief Subscribes to a ROS2 sensor_msgs/msg/JointState topic, and updates kinematics & dynamics.
@@ -54,3 +56,5 @@ class ModelUpdater : public rclcpp::Node
         void
         update(const JointState &state);
 };
+
+}

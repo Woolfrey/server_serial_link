@@ -1,5 +1,6 @@
+
 /**
- * @file    FollowTwist.h
+ * @file    follow_twist.hpp
  * @author  Jon Woolfrey
  * @email   jonathan.woolfrey@gmail.com
  * @date    February 2025
@@ -20,17 +21,19 @@
 #ifndef FOLLOW_TWIST_H
 #define FOLLOW_TWIST_H
 
-#include <ActionServerBase.h>                                                                       // Base class
 #include <geometry_msgs/msg/pose.hpp>
 #include <geometry_msgs/msg/twist.hpp>
 #include <RobotLibrary/Trajectory/CartesianSpline.h>                                                // Trajectory generator
+#include <serial_link_action_server/action_server_base.hpp>                                         // Base class
 #include <serial_link_interfaces/action/follow_twist.hpp>                                           // Custom generated action
 #include <Utilities.h>
+
+namespace serial_link_action_server {
 
 /**
  * @brief This class performs joint trajectory tracking for a serial link robot arm.
  */
-class FollowTwist : public ActionServerBase<serial_link_interfaces::action::FollowTwist>
+class FollowTwist : public serial_link_action_server::ActionServerBase<serial_link_interfaces::action::FollowTwist>
 {
     public:
 
@@ -101,5 +104,7 @@ class FollowTwist : public ActionServerBase<serial_link_interfaces::action::Foll
                                 const std::string &message,
                                 const std::shared_ptr<GoalHandle> goalHandle);
 };                                                                                                  // Semicolon required after a class declaration
+
+}
 
 #endif

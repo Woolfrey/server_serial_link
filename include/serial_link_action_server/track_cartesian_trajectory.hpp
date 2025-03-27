@@ -1,5 +1,5 @@
 /**
- * @file    TrackCartesianTrajectory.h
+ * @file    track_cartesian_trajectory.hpp
  * @author  Jon Woolfrey
  * @email   jonathan.woolfrey@gmail.com
  * @date    February 2025
@@ -20,12 +20,14 @@
 #ifndef TRACK_CARTESIAN_TRAJECTORY_H
 #define TRACK_CARTESIAN_TRAJECTORY_H
 
-#include <ActionServerBase.h>
 #include <geometry_msgs/msg/pose.hpp>
 #include <geometry_msgs/msg/twist.hpp>
 #include <RobotLibrary/Trajectory/CartesianSpline.h>                                                // Trajectory generator
+#include <serial_link_action_server/action_server_base.hpp>
+#include <serial_link_action_server/utilities.hpp>
 #include <serial_link_interfaces/action/track_cartesian_trajectory.hpp>                             // Custom generated action
-#include <Utilities.h>
+
+namespace serial_link_action_server {
 
 /**
  * @brief This class performs joint trajectory tracking for a serial link robot arm.
@@ -96,5 +98,7 @@ class TrackCartesianTrajectory : public ActionServerBase<serial_link_interfaces:
         RL_pose_to_ROS(geometry_msgs::msg::Pose &feedbackPose,
                        const RobotLibrary::Model::Pose &pose);  
 };                                                                                                  // Semicolon required after a class declaration
+
+}
 
 #endif

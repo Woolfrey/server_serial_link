@@ -1,5 +1,5 @@
 /**
- * @file    TrackJointTrajectory.h
+ * @file    track_joint_trajectory.hpp
  * @author  Jon Woolfrey
  * @email   jonathan.woolfrey@gmail.com
  * @date    February 2025
@@ -18,12 +18,14 @@
  * @see https://docs.ros.org/en/humble/index.html for ROS 2 documentation.
  */
 
-#ifndef TRACKJOINTTRAJECTORY_H
-#define TRACKJOINTTRAJECTORY_H
+#ifndef TRACK_JOINT_TRAJECTORY_H
+#define TRACK_JOINT_TRAJECTORY_H
 
-#include <ActionServerBase.h>
 #include <RobotLibrary/Trajectory/SplineTrajectory.h>
+#include <serial_link_action_server/action_server_base.hpp>
 #include <serial_link_interfaces/action/track_joint_trajectory.hpp>
+
+namespace serial_link_action_server {
 
 /**
  * @brief This class performs joint trajectory tracking for a serial link robot arm.
@@ -85,5 +87,7 @@ class TrackJointTrajectory : public ActionServerBase<serial_link_interfaces::act
                                 const std::shared_ptr<GoalHandle> actionManager);
         
 };                                                                                                  // Semicolon required after a class declaration
-            
+          
+}
+  
 #endif
