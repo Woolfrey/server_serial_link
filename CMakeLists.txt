@@ -29,11 +29,11 @@ include_directories(include
                     ${RobotLibrary_INCLUDE_DIRS})
 
 # Trajectory tracking server
-add_executable(trajectory_tracking_server src/trajectory_tracking_server.cpp
-                                          src/ModelUpdater.cpp
-                                          src/TrackCartesianTrajectory.cpp
-                                          src/TrackJointTrajectory.cpp
-                                          src/Utilities.cpp)
+add_executable(trajectory_tracking_server src/nodes/trajectory_tracking_server.cpp
+                                          src/model_updater.cpp
+                                          src/track_cartesian_trajectory.cpp
+                                          src/track_joint_trajectory.cpp
+                                          src/utilities.cpp)
                                           
 target_link_libraries(trajectory_tracking_server Eigen3::Eigen RobotLibrary::RobotLibrary)
 
