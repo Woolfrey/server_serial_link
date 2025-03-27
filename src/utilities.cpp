@@ -1,5 +1,5 @@
 /**
- * @file    Utilities.cpp
+ * @file    utilities.cpp
  * @author  Jon Woolfrey
  * @email   jonathan.woolfrey@gmail.com
  * @date    February 2025
@@ -16,8 +16,9 @@
  * @see https://docs.ros.org/en/humble/index.html for ROS 2 documentation.
  */
  
- 
-#include <Utilities.h>
+#include <serial_link_action_server/utilities.hpp>
+
+namespace serial_link_action_server {
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                          Convert a std::vector object to an Eigen::Matrix                      //
@@ -125,4 +126,6 @@ Eigen_twist_to_ROS(geometry_msgs::msg::Twist &feedbackTwist,
     feedbackTwist.angular.x = twist[3];
     feedbackTwist.angular.y = twist[4];
     feedbackTwist.angular.z = twist[5];
+}
+
 }

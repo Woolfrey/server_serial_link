@@ -1,21 +1,36 @@
 /**
- * @file   velocity_control_server.cpp
- * @author Jon Woolfrey
- * @date   June 2024
- * @brief  This is testing & demonstration.
+ * @file    trajectory_tracking_server.cpp
+ * @author  Jon Woolfrey
+ * @email   jonathan.woolfrey@gmail.com
+ * @date    February 2025
+ * @version 1.0
+ * @brief   Demonstrates the use of joint & cartesian trajectory tracking actions.
+ * 
+ * @details This executable creates two actions, TrackJointTrajectory & TrackCartesianTrajectory,
+ *          and advertises them on the ROS2 network. It builds on the RobotLibrary::Control::SerialLinkBase
+ *          classes to implement real-time feedback control.
+ * 
+ * @copyright Copyright (c) 2025 Jon Woolfrey
+ * 
+ * @license GNU General Public License V3
+ * 
+ * @see https://github.com/Woolfrey/software_robot_library for more information on the SerialLinkBase class.
+ * @see https://docs.ros.org/en/humble/index.html for ROS 2 documentation.
  */
 
-#include <ModelUpdater.h>                                                                           // Joint state subscriber
 #include <RobotLibrary/Control/SerialKinematicControl.h>                                            // For serial link robots
-#include <TrackCartesianTrajectory.h>
-#include <TrackJointTrajectory.h>
-#include <Utilities.h>
+#include <serial_link_action_server/model_updater.hpp>                                              // Joint state subscriber
+#include <serial_link_action_server/track_cartesian_trajectory.hpp>
+#include <serial_link_action_server/track_joint_trajectory.hpp>
+#include <serial_link_action_server/utilities.hpp>
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                                            MAIN                                                //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char **argv)
 {
+    using namespace serial_link_action_server;
+    
     rclcpp::init(argc, argv);                                                                       // Launches ROS2
 
     // Ensure sufficient number of arguments is provided

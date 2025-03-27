@@ -1,14 +1,12 @@
 /**
- * @file    TrackCartesianTrajectory.h
+ * @file    follow_twist.cpp
  * @author  Jon Woolfrey
  * @email   jonathan.woolfrey@gmail.com
  * @date    February 2025
  * @version 1.0
- * @brief   A ROS2 action that enables the endpoint of a robot arm to follow a trajectory.
+ * @brief   A ROS2 action for controlling the velocity of the endpoint of a robot in Cartesian space.
  * 
- * @details This class creates & advertises a ROS2 for Cartesian trajectory tracking. Given a set of
- *          poses and times, it generates a spline trajectory. It then performs real-time feedback
- *          control to make the endpoint of the robot arm follow this trajectory.
+ * @details TO DO.
  * 
  * @copyright Copyright (c) 2025 Jon Woolfrey
  * 
@@ -18,7 +16,9 @@
  * @see https://docs.ros.org/en/humble/index.html for ROS 2 documentation.
  */
 
-#include <FollowTwist.h>
+#include <serial_link_action_server/follow_twist.hpp>
+
+namespace serial_link_action_server {
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                                         Constructor                                            //
@@ -29,11 +29,11 @@ FollowTwist::FollowTwist(std::shared_ptr<rclcpp::Node> node,
                          const std::string &actionName,
                          const std::string &controlTopicName,
                          const std::string &twistTopicName)
-                         : ActionServerBase(node,
-                                            controller,
-                                            mutex,
-                                            actionName,
-                                            controlTopicName)
+: ActionServerBase(node,
+                   controller,
+                   mutex,
+                   actionName,
+                   controlTopicName)
 {
     _feedback->header.frame_id = _controller->model()->base_name();                                 // Save this
      
@@ -248,5 +248,7 @@ FollowTwist::cleanup_and_send_result(const int &status,
         }
     }
 
-    _mutex->unlock();                                                                             // Release control
+    _mutex->unlock();                                                                               // Release control
+}
+
 }

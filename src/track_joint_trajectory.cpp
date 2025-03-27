@@ -1,10 +1,10 @@
 /**
- * @file    TrackJointTrajectory.cpp
+ * @file    track_joint_trajectory.cpp
  * @author  Jon Woolfrey
  * @email   jonathan.woolfrey@gmail.com
- * @date    February 2025
+ * @date    March 2025
  * @version 1.0
- * @brief   A ROS2 action for tracking joint trajectories of a robot arm.
+ * @brief   Source files for the TrackJointTrajectory class
  * 
  * @details This class is used to advertise a ROS2 action server for joint trajectory tracking.
  *          Given a series of joint configurations, and times at which to reach them, it will generate
@@ -18,7 +18,9 @@
  * @see https://docs.ros.org/en/humble/index.html for ROS 2 documentation.
  */
 
-#include <TrackJointTrajectory.h>
+#include <serial_link_action_server/track_joint_trajectory.hpp>
+
+namespace serial_link_action_server {
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                                            Constructor                                         //
@@ -28,14 +30,11 @@ TrackJointTrajectory::TrackJointTrajectory(std::shared_ptr<rclcpp::Node> node,
                                            std::shared_ptr<std::mutex> mutex,
                                            const std::string &actionName,
                                            const std::string &controlTopicName)
-                                           : ActionServerBase
-                                             (
-                                                node,
-                                                controller,
-                                                mutex,
-                                                actionName,
-                                                controlTopicName
-                                             )
+: ActionServerBase(node,
+                   controller,
+                   mutex,
+                   actionName,
+                   controlTopicName)
 {
     // Set the size of arrays based on number of joints in robot model
     
@@ -251,4 +250,6 @@ TrackJointTrajectory::cleanup_and_send_result(const int &status,
     }
 
     _mutex->unlock();                                                                             // Release control in all cases
+}
+
 }

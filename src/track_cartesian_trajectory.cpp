@@ -1,10 +1,10 @@
 /**
- * @file    TrackCartesianTrajectory.h
+ * @file    track_cartesian_trajectory.cpp
  * @author  Jon Woolfrey
  * @email   jonathan.woolfrey@gmail.com
  * @date    February 2025
  * @version 1.0
- * @brief   A ROS2 action that enables the endpoint of a robot arm to follow a trajectory.
+ * @brief   Source files for the TrackCartesianTrajectory class.
  * 
  * @details This class creates & advertises a ROS2 for Cartesian trajectory tracking. Given a set of
  *          poses and times, it generates a spline trajectory. It then performs real-time feedback
@@ -18,7 +18,9 @@
  * @see https://docs.ros.org/en/humble/index.html for ROS 2 documentation.
  */
 
-#include <TrackCartesianTrajectory.h>
+#include <serial_link_action_server/track_cartesian_trajectory.hpp>
+
+namespace serial_link_action_server {
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                                         Constructor                                            //
@@ -278,4 +280,6 @@ TrackCartesianTrajectory::RL_pose_to_ROS(geometry_msgs::msg::Pose &feedbackPose,
     feedbackPose.orientation.x = pose.quaternion().x();
     feedbackPose.orientation.y = pose.quaternion().y();
     feedbackPose.orientation.z = pose.quaternion().z();
+}
+
 }

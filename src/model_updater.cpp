@@ -1,5 +1,5 @@
 /**
- * @file    ModelUpdater.cpp
+ * @file    model_updater.cpp
  * @author  Jon Woolfrey
  * @email   jonathan.woolfrey@gmail.com
  * @date    February 2025
@@ -18,7 +18,9 @@
  * @see https://docs.ros.org/en/humble/index.html for ROS 2 documentation.
  */
 
-#include <ModelUpdater.h>
+#include <serial_link_action_server/model_updater.hpp>
+
+namespace serial_link_action_server{
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                                          Constructor                                           //     
@@ -64,4 +66,6 @@ ModelUpdater::update(const JointState &state)
         
         return;
     }
+}
+
 }
