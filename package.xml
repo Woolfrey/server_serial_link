@@ -10,7 +10,6 @@
    <license>GNU General Public Licence GPLv3</license>
 
    <!-- Basic requirements to build: -->
-   
    <buildtool_depend>ament_cmake</buildtool_depend>
    <test_depend>ament_lint_auto</test_depend>
    <test_depend>ament_lint_common</test_depend>
@@ -20,7 +19,6 @@
    </export>
    
     <!-- Default ROS2 packages -->
-  
    <depend>action_msgs</depend>
    <depend>geometry_msgs</depend>
    <depend>rclcpp</depend>
@@ -29,8 +27,15 @@
    <depend>std_msgs</depend>
 
     <!-- Other packages -->
-
     <build_depend>serial_link_interfaces</build_depend>
     <exec_depend>serial_link_interfaces</exec_depend>
+    
+    <!-- TF2 dependencies for coordinate frame transformations -->
+    <build_depend>tf2</build_depend>
+    <exec_depend>tf2</exec_depend>
+    <build_depend>tf2_ros</build_depend>
+    <exec_depend>tf2_ros</exec_depend>
+    <build_depend>tf2_geometry_msgs</build_depend>
+    <exec_depend>tf2_geometry_msgs</exec_depend>
    
 </package>

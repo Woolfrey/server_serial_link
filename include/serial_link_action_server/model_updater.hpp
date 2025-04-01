@@ -18,9 +18,10 @@
  * @see https://docs.ros.org/en/humble/index.html for ROS 2 documentation.
  */
 
-#include <rclcpp/rclcpp.hpp>
-#include <sensor_msgs/msg/joint_state.hpp>
-#include <RobotLibrary/Model/KinematicTree.h>
+#include <rclcpp/rclcpp.hpp>                                                                        // ROS2 C++ client libraries
+#include <RobotLibrary/Model/KinematicTree.h>                                                       // Custom class for kinematcs & dynamics
+#include <sensor_msgs/msg/joint_state.hpp>                                                          // For publishing joint state
+#include <tf2_ros/transform_broadcaster.h>                                                          // For publishing transforms over ROS2
 
 using JointState = sensor_msgs::msg::JointState;                                                    // For brevity
 
@@ -37,18 +38,26 @@ class ModelUpdater : public rclcpp::Node
          * @brief Constructor.
          * @param model A pointer to the kinematic/dynamic model of the robot.
          * @param topicName The name of the joint state topic to subscribe to.
+         * @param endpointName The name of the endpoint frame in the model.
          */
         ModelUpdater(std::shared_ptr<RobotLibrary::Model::KinematicTree> model,
-                     const std::string &topicName = "joint_states");
+                     const std::string &topicName = "joint_states",
+                     const std::string &endpointName = "unspecified");
         
     private:
 
-        std::shared_ptr<RobotLibrary::Model::KinematicTree> _model;                                 ///< Pointer to robot model.
-        
-        std::string _topicName = "joint_states";                                                    ///< Name of joint state topic to subscribe to
+        geometry_msgs::msg::TransformStamped _transform;                                            ///< Object to be published
         
         rclcpp::Subscription<JointState>::SharedPtr _subscription;                                  ///< This is the fundamental object
         
+        std::shared_ptr<RobotLibrary::Model::KinematicTree> _model;                                 ///< Pointer to robot model.
+
+        std::shared_ptr<tf2_ros::TransformBroadcaster> _transformBroadcaster;                       ///< TF broadcaster for publishing transforms
+
+        std::string _endpointName = "unspecified";                                                  ///< Need to save this
+        
+        RobotLibrary::Model::ReferenceFrame *_endpointFrame;                                        ///< Pointer to the endpoint frame on the model
+                
         /**
          * @brief Callback function that updates the kinematics & dynamics of the model.
          * @param state The joint state message containing position and velocity.
