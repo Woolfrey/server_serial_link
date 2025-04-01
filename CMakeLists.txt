@@ -9,7 +9,11 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# ROS2 packages
+####################################################################################################
+#                                       List build dependencies                                    #
+####################################################################################################
+
+# ROS2:
 find_package(action_msgs REQUIRED)
 find_package(ament_cmake REQUIRED)
 find_package(geometry_msgs REQUIRED)
@@ -18,17 +22,24 @@ find_package(rclcpp_action REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(serial_link_interfaces REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
 
-# 3rd party packages
+# Other:
 find_package(Eigen3 REQUIRED)
 find_package(RobotLibrary REQUIRED)
 
-# Include directories
+# Location of header files:
 include_directories(include
                     ${EIGEN3_INCLUDE_DIRS}
                     ${RobotLibrary_INCLUDE_DIRS})
 
-# Trajectory tracking server
+####################################################################################################
+#                                            Executables                                           #
+####################################################################################################
+
+# Trajectory tracking:
 add_executable(trajectory_tracking_server src/nodes/trajectory_tracking_server.cpp
                                           src/model_updater.cpp
                                           src/track_cartesian_trajectory.cpp
@@ -43,9 +54,36 @@ ament_target_dependencies(trajectory_tracking_server "ament_cmake"
                                                      "rclcpp_action"
                                                      "sensor_msgs"
                                                      "serial_link_interfaces"
-                                                     "std_msgs")
-# Installation
-install(TARGETS trajectory_tracking_server
+                                                     "std_msgs"
+                                                     "tf2"
+                                                     "tf2_ros"
+                                                     "tf2_geometry_msgs")
+
+# Follow twist:
+add_executable(follow_twist_server src/nodes/follow_twist_server.cpp
+                                   src/follow_twist.cpp
+                                   src/model_updater.cpp
+                                   src/track_joint_trajectory.cpp
+                                   src/utilities.cpp)
+                                          
+target_link_libraries(follow_twist_server Eigen3::Eigen RobotLibrary::RobotLibrary)
+
+ament_target_dependencies(follow_twist_server "ament_cmake"
+                                              "geometry_msgs"
+                                              "rclcpp"
+                                              "rclcpp_action"
+                                              "sensor_msgs"
+                                              "serial_link_interfaces"
+                                              "std_msgs"
+                                              "tf2"
+                                              "tf2_ros"
+                                              "tf2_geometry_msgs")
+                                                                                                         
+####################################################################################################
+#                                 Install files so ROS2 can find them                              #
+####################################################################################################
+install(TARGETS follow_twist_server
+                trajectory_tracking_server
         DESTINATION lib/${PROJECT_NAME}
 )
 

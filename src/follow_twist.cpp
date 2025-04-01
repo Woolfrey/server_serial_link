@@ -4,9 +4,12 @@
  * @email   jonathan.woolfrey@gmail.com
  * @date    February 2025
  * @version 1.0
- * @brief   A ROS2 action for controlling the velocity of the endpoint of a robot in Cartesian space.
+ * @brief   Source code for the FollowTwist action server.
  * 
- * @details TO DO.
+ * @details This action enables a serial link robot arm to follow a Cartesian velocity command (twist)
+ *          in real time. It subscribes to a specified geometry_msgs::msg::TwistStamped topic, and uses
+ *          that twist to solve for the necessary joint control. It then publishes the joint control
+ *          over the ROS2 network.
  * 
  * @copyright Copyright (c) 2025 Jon Woolfrey
  * 
@@ -29,11 +32,9 @@ FollowTwist::FollowTwist(std::shared_ptr<rclcpp::Node> node,
                          const std::string &actionName,
                          const std::string &controlTopicName,
                          const std::string &twistTopicName)
-: ActionServerBase(node,
-                   controller,
-                   mutex,
-                   actionName,
-                   controlTopicName)
+: ActionServerBase(node, controller, mutex, actionName, controlTopicName),
+  _transformBuffer(node->get_clock()),                                                              // Pass the node's clock to Buffer
+  _transformListener(_transformBuffer)                                                              // Attach listener to buffer
 {
     _feedback->header.frame_id = _controller->model()->base_name();                                 // Save this
      
@@ -55,16 +56,18 @@ FollowTwist::handle_goal(const rclcpp_action::GoalUUID &uuid,
     (void)uuid;                                                                                     // Prevents colcon from throwing a warning
     
     // Ensure arguments are sound
-    if(goal->linear_tolerance <= 0.0
-    or goal->angular_tolerance <= 0.0)
+    if(goal->linear_tolerance  <= 0.0 or goal->angular_tolerance <= 0.0)
     {
-        RCLCPP_WARN(_node->get_logger(),
-                    "Velocity error tolerances were not positive. "
-                    "Linear tolerance was %f. "
-                    "Angular tolerance was %f.",
-                    goal->linear_tolerance,
-                    goal->angular_tolerance);
+        RCLCPP_WARN(_node->get_logger(), "Velocity error tolerances were not positive. Linear tolerance was %f. Angular tolerance was %f.",
+                    goal->linear_tolerance, goal->angular_tolerance);
 
+        return rclcpp_action::GoalResponse::REJECT;
+    }
+    
+    if(goal->timeout <= 0.0)
+    {
+        RCLCPP_WARN(_node->get_logger(), "Timeout was %f seconds, but must be positive.", goal->timeout);
+        
         return rclcpp_action::GoalResponse::REJECT;
     }
     
@@ -85,14 +88,11 @@ FollowTwist::handle_goal(const rclcpp_action::GoalUUID &uuid,
     _angularError.mean = 0.0;
     _angularError.variance = 0.0;
     _angularError.min = std::numeric_limits<double>::max();
-    _angularError.max = std::numeric_limits<double>::lowest();
-   
     
     // Make sure no other action is using the robot
     if(not _mutex->try_lock())
     {
-        RCLCPP_WARN(_node->get_logger(), "Request for Cartesian trajectory tracking rejected. "
-                                         "Another action is currently using the robot.");
+        RCLCPP_WARN(_node->get_logger(), "Request to follow twist rejected. Another action is currently using the robot.");
         
         return rclcpp_action::GoalResponse::REJECT;
     }
@@ -106,7 +106,7 @@ FollowTwist::handle_goal(const rclcpp_action::GoalUUID &uuid,
 void
 FollowTwist::execute(const std::shared_ptr<GoalHandle> goalHandle)
 {
-    RCLCPP_INFO(_node->get_logger(), "Executing resolved motion rate control.");                    // Inform user
+    RCLCPP_INFO(_node->get_logger(), "Following twist commands.");                                  // Inform user
     
     auto goal = goalHandle->get_goal();                                                             // Save it so we can reference it later
     
@@ -119,33 +119,44 @@ FollowTwist::execute(const std::shared_ptr<GoalHandle> goalHandle)
         // Check to see if the action has been cancelled
         if (goalHandle->is_canceling())
         {
-            cleanup_and_send_result(2, "Resolved motion rate control cancelled.", goalHandle);
+            cleanup_and_send_result(2, "Follow twist cancelled.", goalHandle);
             return;
         }
         
-        // Get the latest twist
-        geometry_msgs::msg::TwistStamped input;
-        
-        std::lock_guard<std::mutex> lock(_twistMutex);                                              // Prevent subscriber from simultaneous access
-        
-        if(_lastTwist and (_node->now() - _lastTwist->header.stamp).seconds() < goal->timeout)
+        // Check for timeout
+        double elapsedTime = (_node->now() - _linearVelocity.header.stamp).seconds();
+        if (elapsedTime > goal->timeout)
         {
-            input = *_lastTwist;                                                                    // Transfer
+             cleanup_and_send_result(3, "Timeout: No new twist command received in " + std::to_string(elapsedTime) + " seconds.", goalHandle); // Abort
+             return;
         }
-        else
+        
+        // Try and look up the transform
+        geometry_msgs::msg::TransformStamped transform;
+        try
         {
-            cleanup_and_send_result(3, "Timeout: no new twist command received.", goalHandle);      // Abort
+            transform = _transformBuffer.lookupTransform(_controller->model()->base_name(), _linearVelocity.header.frame_id, tf2::TimePointZero);
+        }
+        catch (const tf2::TransformException &exception)
+        {
+            RCLCPP_ERROR(_node->get_logger(), "Failed to look up transform: %s", exception.what());
+            cleanup_and_send_result(3, exception.what(), goalHandle);                               // Abort
             return;
         }
         
+        // Rotate the twist to the correct frame
+        geometry_msgs::msg::Vector3Stamped linearRotated, angularRotated;
+        tf2::doTransform(_linearVelocity, linearRotated, transform); 
+        tf2::doTransform(_angularVelocity, angularRotated, transform);           
+   
         // Transfer desired value
         Eigen::Vector<double,6> desiredTwist;
-        desiredTwist[0] = input.twist.linear.x;
-        desiredTwist[1] = input.twist.linear.y;
-        desiredTwist[2] = input.twist.linear.z;
-        desiredTwist[3] = input.twist.angular.x;
-        desiredTwist[4] = input.twist.angular.y;
-        desiredTwist[5] = input.twist.angular.z;
+        desiredTwist[0] = linearRotated.vector.x;
+        desiredTwist[1] = linearRotated.vector.y;
+        desiredTwist[2] = linearRotated.vector.z;
+        desiredTwist[3] = angularRotated.vector.x;
+        desiredTwist[4] = angularRotated.vector.y;
+        desiredTwist[5] = angularRotated.vector.z;
         
         _controller->update();                                                                      // Compute new Jacobian
         
@@ -156,9 +167,9 @@ FollowTwist::execute(const std::shared_ptr<GoalHandle> goalHandle)
             
             publish_joint_command(jointCommands);                                                   // Send to robot immediately
             
-            Eigen::Vector<double,6> actualTwist = _controller->endpoint_velocity();
+            Eigen::Vector<double,6> actualTwist = _controller->endpoint_velocity();                 // Get the actual endpoint velocity
             
-            // Update feedback fields 
+            // Update & publish feedback fields 
             Eigen_twist_to_ROS(_feedback->actual.twist, actualTwist);
             
             Eigen_twist_to_ROS(_feedback->desired.twist, desiredTwist);
@@ -177,8 +188,7 @@ FollowTwist::execute(const std::shared_ptr<GoalHandle> goalHandle)
             update_statistics(_angularError, angularError, n);
             
             // Check tolerances
-            if (linearError  > goal->linear_tolerance
-            or  angularError > goal->angular_tolerance)
+            if (linearError  > goal->linear_tolerance or  angularError > goal->angular_tolerance)
             {
                 cleanup_and_send_result(3, "Velocity error tolerance violated.", goalHandle);       // Abort
                 return;
@@ -191,23 +201,27 @@ FollowTwist::execute(const std::shared_ptr<GoalHandle> goalHandle)
         catch (const std::exception &exception)
         {
             RCLCPP_ERROR(_node->get_logger(), exception.what());
-            cleanup_and_send_result(3, "Resolved motion rate control failed.", goalHandle);         // Couldn't solve control; abort.
+            cleanup_and_send_result(3, "Failed to solve joint control.", goalHandle);               // Couldn't solve control; abort.
             return;
         }
     }
     
     // Technically, this should never be called.
-    cleanup_and_send_result(1, "Follow twist action completed.", goalHandle);
+    cleanup_and_send_result(1, "Follow twist completed.", goalHandle);
 }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                                       Store new twist commands                                 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void
-FollowTwist::twist_callback(const geometry_msgs::msg::TwistStamped::SharedPtr msg)
+FollowTwist::twist_callback(const geometry_msgs::msg::TwistStamped::SharedPtr input)
 {
-    std::lock_guard<std::mutex> lock(_twistMutex);                                                  // Prevents control thread from accessing data at same time
-    _lastTwist = *msg;                                                                              // Save
+    // NOTE: We need to save values as Vector3 so we can rotate them later
+    _linearVelocity.header = input->header;
+    _linearVelocity.vector = input->twist.linear;
+    
+    _angularVelocity.header = input->header;
+    _angularVelocity.vector = input->twist.angular;
 }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -231,19 +245,19 @@ FollowTwist::cleanup_and_send_result(const int &status,
         case 1:                                                                                     // Successfully completed
         {
             goalHandle->succeed(result);
-            RCLCPP_INFO(_node->get_logger(), "Cartesian trajectory tracking complete. Awaiting new request.");
+            RCLCPP_INFO(_node->get_logger(), "Follow twist finished. Awaiting new request.");
             break;
         }
         case 2:                                                                                     // Cancelled
         {
             goalHandle->canceled(result);
-            RCLCPP_INFO(_node->get_logger(), "Cartesian trajectory tracking cancelled. Awaiting new request.");
+            RCLCPP_INFO(_node->get_logger(), "Follow twist cancelled. Awaiting new request.");
             break;
         }
         case 3:                                                                                     // Aborted
         {
             goalHandle->abort(result);
-            RCLCPP_ERROR(_node->get_logger(), "Cartesian trajectory tracking aborted.");
+            RCLCPP_ERROR(_node->get_logger(), "Follow twist aborted.");
             break;
         }
     }

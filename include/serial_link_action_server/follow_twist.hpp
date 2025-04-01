@@ -3,7 +3,7 @@
  * @file    follow_twist.hpp
  * @author  Jon Woolfrey
  * @email   jonathan.woolfrey@gmail.com
- * @date    February 2025
+ * @date    March 2025
  * @version 1.0
  * @brief   A ROS2 action that enables a robot arm to follow a twist command.
  * 
@@ -21,17 +21,19 @@
 #ifndef FOLLOW_TWIST_H
 #define FOLLOW_TWIST_H
 
-#include <geometry_msgs/msg/pose.hpp>
 #include <geometry_msgs/msg/twist.hpp>
 #include <RobotLibrary/Trajectory/CartesianSpline.h>                                                // Trajectory generator
 #include <serial_link_action_server/action_server_base.hpp>                                         // Base class
+#include <serial_link_action_server/utilities.hpp>                                                  // Helper functions
 #include <serial_link_interfaces/action/follow_twist.hpp>                                           // Custom generated action
-#include <Utilities.h>
+#include <tf2_ros/buffer.h>                                                                         // Stores transform chains
+#include <tf2_ros/transform_listener.h>                                                             // Gets transform
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 namespace serial_link_action_server {
 
 /**
- * @brief This class performs joint trajectory tracking for a serial link robot arm.
+ * @brief This class enables a robot arm to move the endpoint at a given speed.
  */
 class FollowTwist : public serial_link_action_server::ActionServerBase<serial_link_interfaces::action::FollowTwist>
 {
@@ -53,22 +55,26 @@ class FollowTwist : public serial_link_action_server::ActionServerBase<serial_li
         FollowTwist(std::shared_ptr<rclcpp::Node> node,
                     std::shared_ptr<RobotLibrary::Control::SerialLinkBase> controller,
                     std::shared_ptr<std::mutex> mutex,
-                    const std::string &actionName = "track_cartesian_trajectory",
+                    const std::string &actionName = "follow_twist",
                     const std::string &controlTopicName = "joint_commands",
                     const std::string &twistTopicName = "twist_command");
     
     private:
 
+        geometry_msgs::msg::Vector3Stamped _angularVelocity;                                        ///< Received from the TwistStamped topic
+        
+        geometry_msgs::msg::Vector3Stamped _linearVelocity;                                         ///< Received from the TwistStamped topic
+         
         rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr _twistSubscriber;         ///< Subscribes to twist topic
         
         serial_link_interfaces::msg::Statistics _angularError;                                      ///< Statistical summary of orientation tracking performance
         
         serial_link_interfaces::msg::Statistics _linearError;                                       ///< Statistical summary of position tracking performance
         
-        std::optional<geometry_msgs::msg::TwistStamped> _lastTwist;                                 ///< Save the last received message from the publisher
+        tf2_ros::Buffer _transformBuffer;                                                           ///< Stores transforms
         
-        std::mutex _twistMutex;                                                                     ///< Prevents subscriber & controller accessing twist simultaneously
- 
+        tf2_ros::TransformListener _transformListener;                                              ///< Updates buffer with TF messages
+
         /**
          * @brief Processes action requests from the server.
          * @param uuid A unique identification for this goal request.
@@ -83,15 +89,14 @@ class FollowTwist : public serial_link_action_server::ActionServerBase<serial_li
          * @param goalHandle A shared pointer to the goal hande object.
          */
         void
-        execute(const std::shared_ptr<GoalHandle> goalHandle);
-        
+        execute(const std::shared_ptr<GoalHandle> goalHandle);   
         
         /**
          * @brief Updates the twist command when new messages are received.
          * @param
          */
         void
-        twist_callback(const geometry_msgs::msg::TwistStamped::SharedPtr msg);
+        twist_callback(const geometry_msgs::msg::TwistStamped::SharedPtr input);
         
         /**
          * @brief Completes the action and sends result to client.
