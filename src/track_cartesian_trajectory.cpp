@@ -2,7 +2,7 @@
  * @file    track_cartesian_trajectory.cpp
  * @author  Jon Woolfrey
  * @email   jonathan.woolfrey@gmail.com
- * @date    February 2025
+ * @date    March 2025
  * @version 1.0
  * @brief   Source files for the TrackCartesianTrajectory class.
  * 
@@ -30,12 +30,11 @@ TrackCartesianTrajectory::TrackCartesianTrajectory(std::shared_ptr<rclcpp::Node>
                                                    std::shared_ptr<std::mutex> mutex,
                                                    const std::string &actionName,
                                                    const std::string &controlTopicName)
-                                                   : ActionServerBase(
-                                                        node,
-                                                        controller,
-                                                        mutex,
-                                                        actionName,
-                                                        controlTopicName)
+: ActionServerBase(node,
+                   controller,
+                   mutex,
+                   actionName,
+                   controlTopicName)
 {
     _feedback->header.frame_id = _controller->model()->base_name();
 }
