@@ -30,55 +30,49 @@ FollowTwist::FollowTwist(std::shared_ptr<rclcpp::Node> node,
                          std::shared_ptr<RobotLibrary::Control::SerialLinkBase> controller,
                          std::shared_ptr<std::mutex> mutex,
                          const std::string &actionName,
-                         const std::string &controlTopicName,
-                         const std::string &twistTopicName)
+                         const std::string &controlTopicName)
+                         
 : ActionServerBase(node, controller, mutex, actionName, controlTopicName),
   _transformBuffer(node->get_clock()),                                                              // Pass the node's clock to Buffer
   _transformListener(_transformBuffer)                                                              // Attach listener to buffer
 {
     _feedback->header.frame_id = _controller->model()->base_name();                                 // Save this
-     
-    _twistSubscriber = node->create_subscription<geometry_msgs::msg::TwistStamped>
-    (
-        twistTopicName,
-        1,
-        std::bind(&FollowTwist::twist_callback, this, std::placeholders::_1)
-    );
 }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////// 
  //                          Process request to track Cartesian trajectory                         // 
 ////////////////////////////////////////////////////////////////////////////////////////////////////  
 rclcpp_action::GoalResponse
-FollowTwist::handle_goal(const rclcpp_action::GoalUUID &uuid,
-                         std::shared_ptr<const Action::Goal> goal)
+FollowTwist::handle_goal(const rclcpp_action::GoalUUID &uuid, std::shared_ptr<const Action::Goal> goal)
 {
     (void)uuid;                                                                                     // Prevents colcon from throwing a warning
+    
+    RCLCPP_INFO(_node->get_logger(), "Received request to follow twist.");                          // Inform the user
     
     // Ensure arguments are sound
     if(goal->linear_tolerance  <= 0.0 or goal->angular_tolerance <= 0.0)
     {
-        RCLCPP_WARN(_node->get_logger(), "Velocity error tolerances were not positive. Linear tolerance was %f. Angular tolerance was %f.",
+        RCLCPP_WARN(_node->get_logger(),
+                    "Velocity error tolerances were not positive. "
+                    "Linear tolerance was %f. Angular tolerance was %f.",
                     goal->linear_tolerance, goal->angular_tolerance);
 
         return rclcpp_action::GoalResponse::REJECT;
     }
-    
-    if(goal->timeout <= 0.0)
+    else if(goal->timeout <= 0.0)
     {
-        RCLCPP_WARN(_node->get_logger(), "Timeout was %f seconds, but must be positive.", goal->timeout);
+        RCLCPP_WARN(_node->get_logger(),
+                    "Timeout was %f seconds, but must be positive.",
+                    goal->timeout);
         
         return rclcpp_action::GoalResponse::REJECT;
     }
-    
-    // Check that the subscription topic exists
-    if (_node->count_publishers(_twistSubscriber->get_topic_name()) == 0)
+    else if(_node->count_publishers(goal->topic_name) == 0)
     {
-        RCLCPP_WARN(_node->get_logger(), "Topic '%s' is not advertised. Rejecting goal.", _twistSubscriber->get_topic_name());
-        
+        RCLCPP_WARN(_node->get_logger(), "No publishers found on topic '%s'.", goal->topic_name.c_str());
         return rclcpp_action::GoalResponse::REJECT;
     }
-    
+      
     // (Re)set statistics
     _linearError.mean = 0.0;
     _linearError.variance = 0.0;
@@ -92,10 +86,21 @@ FollowTwist::handle_goal(const rclcpp_action::GoalUUID &uuid,
     // Make sure no other action is using the robot
     if(not _mutex->try_lock())
     {
-        RCLCPP_WARN(_node->get_logger(), "Request to follow twist rejected. Another action is currently using the robot.");
+        RCLCPP_WARN(_node->get_logger(), "Another action is currently using the robot.");
         
         return rclcpp_action::GoalResponse::REJECT;
     }
+    
+    // Create the subscriber
+    _twistSubscriber = _node->create_subscription<geometry_msgs::msg::TwistStamped>
+    (
+        goal->topic_name,
+        1,
+        std::bind(&FollowTwist::twist_callback, this, std::placeholders::_1)
+    );
+    
+    _lastTwistHeader.stamp = _node->now();
+    _lastTwistHeader.frame_id = "unset";
 
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;                                         // Return success and continue to execution
 }
@@ -106,17 +111,30 @@ FollowTwist::handle_goal(const rclcpp_action::GoalUUID &uuid,
 void
 FollowTwist::execute(const std::shared_ptr<GoalHandle> goalHandle)
 {
-    RCLCPP_INFO(_node->get_logger(), "Following twist commands.");                                  // Inform user
-    
     auto goal = goalHandle->get_goal();                                                             // Save it so we can reference it later
-    
+
+    RCLCPP_INFO(_node->get_logger(), "Following twist commands on the `%s` topic.", goal->topic_name.c_str()); // Inform the user
+      
     rclcpp::Rate loopRate(_controller->frequency());                                                // Used to regulate control loop timing
     
     unsigned long long int n = 1;                                                                   // Used for statistics    
-    
+
+    // We need to give the node a bit of time to execute the twist_callback() method
+    while (rclcpp::ok() && _lastTwistHeader.frame_id == "unset") 
+    {
+        if ((_node->now() - _lastTwistHeader.stamp).seconds() > goal->timeout)
+        {
+            cleanup_and_send_result(3, "Timeout: Failed to receive the first twist message in "
+                                    + std::to_string((_node->now() - _lastTwistHeader.stamp).seconds()), goalHandle);
+            return;
+        }
+        
+        rclcpp::sleep_for(std::chrono::milliseconds(10));                                           // Small delay to allow messages to be processed
+    }
+  
     while(rclcpp::ok())
     {
-        // Check to see if the action has been cancelled
+        // Check for
         if (goalHandle->is_canceling())
         {
             cleanup_and_send_result(2, "Follow twist cancelled.", goalHandle);
@@ -124,7 +142,7 @@ FollowTwist::execute(const std::shared_ptr<GoalHandle> goalHandle)
         }
         
         // Check for timeout
-        double elapsedTime = (_node->now() - _linearVelocity.header.stamp).seconds();
+        double elapsedTime = (_node->now() - _lastTwistHeader.stamp).seconds();
         if (elapsedTime > goal->timeout)
         {
              cleanup_and_send_result(3, "Timeout: No new twist command received in " + std::to_string(elapsedTime) + " seconds.", goalHandle); // Abort
@@ -135,7 +153,7 @@ FollowTwist::execute(const std::shared_ptr<GoalHandle> goalHandle)
         geometry_msgs::msg::TransformStamped transform;
         try
         {
-            transform = _transformBuffer.lookupTransform(_controller->model()->base_name(), _linearVelocity.header.frame_id, tf2::TimePointZero);
+            transform = _transformBuffer.lookupTransform(_controller->model()->base_name(), _lastTwistHeader.frame_id, tf2::TimePointZero);
         }
         catch (const tf2::TransformException &exception)
         {
@@ -150,13 +168,12 @@ FollowTwist::execute(const std::shared_ptr<GoalHandle> goalHandle)
         tf2::doTransform(_angularVelocity, angularRotated, transform);           
    
         // Transfer desired value
-        Eigen::Vector<double,6> desiredTwist;
-        desiredTwist[0] = linearRotated.vector.x;
-        desiredTwist[1] = linearRotated.vector.y;
-        desiredTwist[2] = linearRotated.vector.z;
-        desiredTwist[3] = angularRotated.vector.x;
-        desiredTwist[4] = angularRotated.vector.y;
-        desiredTwist[5] = angularRotated.vector.z;
+        Eigen::Vector<double,6> desiredTwist{linearRotated.vector.x,
+                                             linearRotated.vector.y,
+                                             linearRotated.vector.z,
+                                             angularRotated.vector.x,
+                                             angularRotated.vector.y,
+                                             angularRotated.vector.z};
         
         _controller->update();                                                                      // Compute new Jacobian
         
@@ -171,7 +188,7 @@ FollowTwist::execute(const std::shared_ptr<GoalHandle> goalHandle)
             
             // Update & publish feedback fields 
             Eigen_twist_to_ROS(_feedback->actual.twist, actualTwist);
-            
+ 
             Eigen_twist_to_ROS(_feedback->desired.twist, desiredTwist);
 
             _feedback->manipulability = _controller->manipulability();
@@ -182,19 +199,23 @@ FollowTwist::execute(const std::shared_ptr<GoalHandle> goalHandle)
             
             // Update error statistics for result message
             Eigen::VectorXd twistError = desiredTwist - _controller->endpoint_velocity();
+            
             double linearError = twistError.head(3).norm();
-            double angularError = twistError.tail(3).norm();
+
             update_statistics(_linearError, linearError, n);
+            
+            double angularError = twistError.tail(3).norm();
+            
             update_statistics(_angularError, angularError, n);
             
+            ++n;                                                                                    // Increment sample size
+            
             // Check tolerances
-            if (linearError  > goal->linear_tolerance or  angularError > goal->angular_tolerance)
+            if (linearError  > goal->linear_tolerance or angularError > goal->angular_tolerance)
             {
                 cleanup_and_send_result(3, "Velocity error tolerance violated.", goalHandle);       // Abort
                 return;
             }
-            
-            ++n;                                                                                    // Increment sample size
             
             loopRate.sleep();                                                                       // Synchronise with control frequency                   
         }
@@ -205,6 +226,8 @@ FollowTwist::execute(const std::shared_ptr<GoalHandle> goalHandle)
             return;
         }
     }
+    
+    _twistSubscriber.reset();                                                                       // Stop subscriber to free up resources
     
     // Technically, this should never be called.
     cleanup_and_send_result(1, "Follow twist completed.", goalHandle);
@@ -222,6 +245,8 @@ FollowTwist::twist_callback(const geometry_msgs::msg::TwistStamped::SharedPtr in
     
     _angularVelocity.header = input->header;
     _angularVelocity.vector = input->twist.angular;
+    
+    _lastTwistHeader = input->header;
 }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////

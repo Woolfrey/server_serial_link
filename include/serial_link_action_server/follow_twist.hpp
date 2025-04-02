@@ -1,4 +1,3 @@
-
 /**
  * @file    follow_twist.hpp
  * @author  Jon Woolfrey
@@ -21,8 +20,6 @@
 #ifndef FOLLOW_TWIST_H
 #define FOLLOW_TWIST_H
 
-#include <geometry_msgs/msg/twist.hpp>
-#include <RobotLibrary/Trajectory/CartesianSpline.h>                                                // Trajectory generator
 #include <serial_link_action_server/action_server_base.hpp>                                         // Base class
 #include <serial_link_action_server/utilities.hpp>                                                  // Helper functions
 #include <serial_link_interfaces/action/follow_twist.hpp>                                           // Custom generated action
@@ -56,16 +53,17 @@ class FollowTwist : public serial_link_action_server::ActionServerBase<serial_li
                     std::shared_ptr<RobotLibrary::Control::SerialLinkBase> controller,
                     std::shared_ptr<std::mutex> mutex,
                     const std::string &actionName = "follow_twist",
-                    const std::string &controlTopicName = "joint_commands",
-                    const std::string &twistTopicName = "twist_command");
+                    const std::string &controlTopicName = "joint_commands");
     
     private:
 
         geometry_msgs::msg::Vector3Stamped _angularVelocity;                                        ///< Received from the TwistStamped topic
         
         geometry_msgs::msg::Vector3Stamped _linearVelocity;                                         ///< Received from the TwistStamped topic
-         
-        rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr _twistSubscriber;         ///< Subscribes to twist topic
+        
+        rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr _twistSubscriber;
+        
+        std_msgs::msg::Header _lastTwistHeader;
         
         serial_link_interfaces::msg::Statistics _angularError;                                      ///< Statistical summary of orientation tracking performance
         
