@@ -78,11 +78,32 @@ ament_target_dependencies(follow_twist_server "ament_cmake"
                                               "tf2"
                                               "tf2_ros"
                                               "tf2_geometry_msgs")
+                                              
+# Follow transform:
+add_executable(follow_transform_server src/nodes/follow_transform_server.cpp
+                                       src/follow_transform.cpp
+                                       src/model_updater.cpp
+                                       src/track_joint_trajectory.cpp
+                                       src/utilities.cpp)
+                                          
+target_link_libraries(follow_transform_server Eigen3::Eigen RobotLibrary::RobotLibrary)
+
+ament_target_dependencies(follow_transform_server "ament_cmake"
+                                                  "geometry_msgs"
+                                                  "rclcpp"
+                                                  "rclcpp_action"
+                                                  "sensor_msgs"
+                                                  "serial_link_interfaces"
+                                                  "std_msgs"
+                                                  "tf2"
+                                                  "tf2_ros"
+                                                  "tf2_geometry_msgs")
                                                                                                          
 ####################################################################################################
 #                                 Install files so ROS2 can find them                              #
 ####################################################################################################
-install(TARGETS follow_twist_server
+install(TARGETS follow_transform_server
+                follow_twist_server
                 trajectory_tracking_server
         DESTINATION lib/${PROJECT_NAME}
 )
