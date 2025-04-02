@@ -89,14 +89,6 @@ class TrackCartesianTrajectory : public ActionServerBase<serial_link_interfaces:
                                 const std::string &message,
                                 const std::shared_ptr<ActionManager> actionManager);
         
-        /**
-         * @brief Puts a RobotLibrary::Pose object in to a ROS2 geometry_msgs/Pose
-         * @param feedbackPose The ROS msg
-         * @param pose The RobotLibrary object.
-         */
-        void
-        RL_pose_to_ROS(geometry_msgs::msg::Pose &feedbackPose,
-                       const RobotLibrary::Model::Pose &pose);  
 };                                                                                                  // Semicolon required after a class declaration
 
 }

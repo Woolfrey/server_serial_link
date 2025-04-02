@@ -128,4 +128,20 @@ Eigen_twist_to_ROS(geometry_msgs::msg::Twist &feedbackTwist,
     feedbackTwist.angular.z = twist[5];
 }
 
+  ////////////////////////////////////////////////////////////////////////////////////////////////////
+ //                Puts a RobotLibrary::Model::Pose object into a ROS2 geometry_msgs/Pose                 //
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void
+RL_pose_to_ROS(geometry_msgs::msg::Pose &feedbackPose,
+               const RobotLibrary::Model::Pose &pose)
+{
+    feedbackPose.position.x    = pose.translation()[0];
+    feedbackPose.position.y    = pose.translation()[1];
+    feedbackPose.position.z    = pose.translation()[2];
+    feedbackPose.orientation.w = pose.quaternion().w();
+    feedbackPose.orientation.x = pose.quaternion().x();
+    feedbackPose.orientation.y = pose.quaternion().y();
+    feedbackPose.orientation.z = pose.quaternion().z();
 }
+
+} // namespace

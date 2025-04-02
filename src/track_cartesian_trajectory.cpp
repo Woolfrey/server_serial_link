@@ -179,6 +179,7 @@ TrackCartesianTrajectory::execute(const std::shared_ptr<GoalHandle> goalHandle)
             Eigen_twist_to_ROS(_feedback->actual.twist, twist);                                     // Convert from Eigen object to ROS2 msg
             
             RL_pose_to_ROS(_feedback->desired.pose, desiredPose);
+            
             Eigen_twist_to_ROS(_feedback->desired.twist, desiredVelocity);           
 
             // Set the desired accelerations from the trajectory
@@ -263,22 +264,6 @@ TrackCartesianTrajectory::cleanup_and_send_result(const int &status,
     }
 
     _mutex->unlock();                                                                             // Release control
-}
-
-  ////////////////////////////////////////////////////////////////////////////////////////////////////
- //                Puts a RobotLibrary::Model::Pose object into a ROS2 geometry_msgs/Pose                 //
-////////////////////////////////////////////////////////////////////////////////////////////////////
-void
-TrackCartesianTrajectory::RL_pose_to_ROS(geometry_msgs::msg::Pose &feedbackPose,
-                                         const RobotLibrary::Model::Pose &pose)
-{
-    feedbackPose.position.x    = pose.translation()[0];
-    feedbackPose.position.y    = pose.translation()[1];
-    feedbackPose.position.z    = pose.translation()[2];
-    feedbackPose.orientation.w = pose.quaternion().w();
-    feedbackPose.orientation.x = pose.quaternion().x();
-    feedbackPose.orientation.y = pose.quaternion().y();
-    feedbackPose.orientation.z = pose.quaternion().z();
 }
 
 }

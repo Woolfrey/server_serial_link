@@ -21,6 +21,7 @@
  
 #include <Eigen/Core>
 #include <geometry_msgs/msg/twist.hpp>
+#include <geometry_msgs/msg/pose.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <RobotLibrary/Control/SerialLinkBase.h>
 #include <serial_link_interfaces/msg/statistics.hpp>
@@ -62,7 +63,15 @@ update_statistics(serial_link_interfaces::msg::Statistics &statistics,
 void
 Eigen_twist_to_ROS(geometry_msgs::msg::Twist &feedbackTwist,
                    const Eigen::Vector<double, 6> &twist);
-
+                   
+/**
+ * @brief Puts a RobotLibrary::Pose object in to a ROS2 geometry_msgs/Pose
+ * @param feedbackPose The ROS msg
+ * @param pose The RobotLibrary object.
+ */
+void
+RL_pose_to_ROS(geometry_msgs::msg::Pose &feedbackPose,
+               const RobotLibrary::Model::Pose &pose);
 }
 
 #endif
