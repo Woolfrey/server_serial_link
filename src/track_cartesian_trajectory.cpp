@@ -52,12 +52,8 @@ TrackCartesianTrajectory::handle_goal(const rclcpp_action::GoalUUID &uuid,
     if(goal->position_tolerance <= 0.0
     or goal->orientation_tolerance <= 0.0)
     {
-        RCLCPP_WARN(_node->get_logger(),
-                    "Tolerances were not positive. "
-                    "Position tolerance was %f. "
-                    "Orientation tolerance was %f.",
-                    goal->position_tolerance,
-                    goal->orientation_tolerance);
+        RCLCPP_WARN(_node->get_logger(), "Tolerances were not positive. Position tolerance was %f. Orientation tolerance was %f.",
+                    goal->position_tolerance, goal->orientation_tolerance);
 
         return rclcpp_action::GoalResponse::REJECT;
     }
@@ -183,9 +179,9 @@ TrackCartesianTrajectory::execute(const std::shared_ptr<GoalHandle> goalHandle)
             Eigen_twist_to_ROS(_feedback->desired.twist, desiredVelocity);           
 
             // Set the desired accelerations from the trajectory
-            _feedback->desired.accel.linear.x = desiredAcceleration[0];
-            _feedback->desired.accel.linear.y = desiredAcceleration[1];
-            _feedback->desired.accel.linear.z = desiredAcceleration[2];
+            _feedback->desired.accel.linear.x  = desiredAcceleration[0];
+            _feedback->desired.accel.linear.y  = desiredAcceleration[1];
+            _feedback->desired.accel.linear.z  = desiredAcceleration[2];
             _feedback->desired.accel.angular.x = desiredAcceleration[3];
             _feedback->desired.accel.angular.y = desiredAcceleration[4];
             _feedback->desired.accel.angular.z = desiredAcceleration[5];
@@ -202,16 +198,24 @@ TrackCartesianTrajectory::execute(const std::shared_ptr<GoalHandle> goalHandle)
             double orientationError = error.tail(3).norm();
             update_statistics(_positionError, positionError, n);         
             update_statistics(_orientationError, orientationError, n);
-            
-            // Check tolerances
-            if (positionError > goal->position_tolerance or orientationError > goal->orientation_tolerance)
-            {
-                cleanup_and_send_result(3, "Trajectory tracking tolerance violated.", goalHandle);  // Abort
-                return;
-            }
-            
             ++n;                                                                                    // Increment sample size
             
+            // Check tolerances
+            if (positionError > goal->position_tolerance)
+            {
+                cleanup_and_send_result(3, "Position error tolerance violated: "
+                                        + std::to_string(positionError) + " >= " + std::to_string(goal->position_tolerance) + ".",
+                                        goalHandle);
+                return;
+            }
+            else if (orientationError > goal->orientation_tolerance)
+            {
+                cleanup_and_send_result(3, "Orientation error tolerance violated: "
+                                        + std::to_string(orientationError) + " >= " + std::to_string(goal->orientation_tolerance) + ".",
+                                        goalHandle);
+                return;
+            }
+              
             loopRate.sleep();                                                                       // Synchronise with control frequency                   
         }
         catch (const std::exception &exception)

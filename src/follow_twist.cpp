@@ -40,7 +40,7 @@ FollowTwist::FollowTwist(std::shared_ptr<rclcpp::Node> node,
 }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////// 
- //                          Process request to track Cartesian trajectory                         // 
+ //                                Process request to follow twist                                 // 
 ////////////////////////////////////////////////////////////////////////////////////////////////////  
 rclcpp_action::GoalResponse
 FollowTwist::handle_goal(const rclcpp_action::GoalUUID &uuid, std::shared_ptr<const Action::Goal> goal)
@@ -211,9 +211,18 @@ FollowTwist::execute(const std::shared_ptr<GoalHandle> goalHandle)
             ++n;                                                                                    // Increment sample size
             
             // Check tolerances
-            if (linearError  > goal->linear_tolerance or angularError > goal->angular_tolerance)
+            if (linearError > goal->linear_tolerance)
             {
-                cleanup_and_send_result(3, "Velocity error tolerance violated.", goalHandle);       // Abort
+                cleanup_and_send_result(3, "Linear velocity error tolerance violated: "
+                                        + std::to_string(linearError) + " >= " + std::to_string(goal->linear_tolerance) + ".",
+                                        goalHandle);
+                return;
+            }
+            else if (angularError > goal->angular_tolerance)
+            {
+                cleanup_and_send_result(3, "Angular velocity error tolerance violated: "
+                                        + std::to_string(angularError) + " >= " + std::to_string(goal->angular_tolerance) + ".",
+                                        goalHandle);
                 return;
             }
             

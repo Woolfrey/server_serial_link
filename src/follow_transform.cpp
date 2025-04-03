@@ -177,9 +177,18 @@ FollowTransform::execute(const std::shared_ptr<GoalHandle> goalHandle)
             ++n;                                                                                    // Increment sample size
             
             // Check tolerances
-            if (positionError  > goal->position_tolerance or orientationError > goal->orientation_tolerance)
+            if (positionError > goal->position_tolerance)
             {
-                cleanup_and_send_result(3, "Pose error tolerance violated.", goalHandle);       // Abort
+                cleanup_and_send_result(3, "Position error tolerance violated: "
+                                        + std::to_string(positionError) + " >= " + std::to_string(goal->position_tolerance) + ".",
+                                        goalHandle);
+                return;
+            }
+            else if (orientationError > goal->orientation_tolerance)
+            {
+                cleanup_and_send_result(3, "Orientation error tolerance violated: "
+                                        + std::to_string(orientationError) + " >= " + std::to_string(goal->orientation_tolerance) + ".",
+                                        goalHandle);
                 return;
             }
             
