@@ -12,7 +12,7 @@ This package contains [ROS2 action servers](https://design.ros2.org/articles/act
 - [Requirements](#clipboard-requirements)
 - [Installation](#floppy_disk-installation)
 - [Usage](#wrench-usage)
-- [Classes](#toolbox-classes)
+- [Nodes](#satellite-nodes)
 - [Release Notes](#package-release-notes---v100-april-2025)
 - [Contributing](#handshake-contributing)
 - [License](#scroll-license)
@@ -91,108 +91,29 @@ If you scroll down the list, you should see both `serial_link_action_server`, an
 
 You can always write your own [action server from scratch](https://docs.ros.org/en/foxy/Tutorials/Intermediate/Writing-an-Action-Server-Client/Cpp.html). But if you build upon the `ActionServerBase` class provided in this package you need to:
 
-1. Define the `handle_goal`, and `execute` methods:
-
-```
-class CustomClass : public serial_link_action_server::ActionServerBase<serial_link_interfaces::action::ActionName>
-{
-    public:
-
-        CustomClass(std::shared_ptr<rclcpp::Node> node,
-                    std::shared_ptr<RobotLibrary::Control::SerialLinkBase> controller,
-                    std::shared_ptr<std::mutex> mutex,
-                    const std::string &actionName = "follow_transform",
-                    const std::string &controlTopicName = "joint_commands")
-        {
-            // Write constructor
-        }
-    
-    private:
-
-        rclcpp_action::GoalResponse
-        handle_goal(const rclcpp_action::GoalUUID &uuid,
-                    std::shared_ptr<const Action::Goal> goal)
-        {
-            // Write goal handling
-        }
-
-        void
-        execute(const std::shared_ptr<GoalHandle> goalHandle)
-        {
-            // Write action execution
-        }
-};
-```
-
-2. Create an executable, attach a node, and spin:
-
-```
-int main(int argc, char **argv)
-{
-    using namespace serial_link_action_server;                                                      // For brevity
-    
-    rclcpp::init(argc, argv);                                                                       // Launches ROS2
-    // For clarity:
-    std::string urdfPath        = argv[1];
-    std::string endpointName    = argv[2];
-    std::string controlTopic    = argv[3];
-    std::string jointStateTopic = argv[4];
-        
-    try 
-    {
-        auto model            = std::make_shared<RobotLibrary::Model::KinematicTree>(urdfPath);       // Generate dynamic model
-        auto modelUpdaterNode = std::make_shared<ModelUpdater>(model, jointStateTopic, endpointName); // Create node for updating joint state
-        auto serverNode       = std::make_shared<rclcpp::Node>(model->name()+"_action_server");       // Create action server nodes
-        auto controller       = std::make_shared<RobotLibrary::Control::SerialKinematicControl>(model, endpointName, load_control_parameters(serverNode));
-          
-        // Declare action servers
-        auto mutex = std::make_shared<std::mutex>();                                                // This stops 2 actions using the robot at the same time
-        TrackJointTrajectory jointTrajectoryServer(serverNode, controller, mutex, "track_joint_trajectory", controlTopic);
-        CustomClass jointTrajectoryServer(serverNode, controller, mutex, "custom_action_name", controlTopic);
-          
-        // Add nodes to executor and spin
-        rclcpp::executors::MultiThreadedExecutor executor;
-        executor.add_node(modelUpdaterNode);
-        executor.add_node(serverNode);
-        executor.spin();
-        rclcpp::shutdown();
-        return 0;
-    }
-    catch(const std::exception &exception)
-    {
-        RCLCPP_ERROR(rclcpp::get_logger("main"), exception.what());
-        rclcpp::shutdown(); 
-        return 1;
-    }  
-}
-```
+1. Define the `handle_goal`, and `execute` methods, and
+2. Create an executable, attach a node, and spin.
 
 > [!NOTE]
 > The `handle_cancel` and `handle_accepted` are defined in the `ActionServerBase` and can always be overridden with custom methods.
 
-Notice that _multiple_ actions can be attached to the server node, so a robot can perform complex tasks.
+_Multiple_ actions can be attached to the server node, so a robot can perform complex tasks.
 
-To make the action work we need:
+To make an action server node work we need:
 1. A `RobotLibrary::Model::KinematicTree` object which is attached to the
 2. `serial_link_action_server::ModelUpdater` node,
 3. A `RobotLibrary::Control` object, and
 4. A `std::mutex` to stop 2 actions using the robot at the same time.
 
-## :toolbox: Classes
+## :satellite: Nodes
 
-:construction: Under construction.
+This package contains nodes with pre-configured actions that you can use. Of course, you can easily make your own, and mix-and-match different actions to suit your own task.
 
-### SerialLinkBase
+### Follow Transform Server
 
-### FollowTransform
+### Follow Twist Server
 
-### FollowTwist
-
-### ModelUpdater
-
-### TrackCartesianTrajectory
-
-### TrackJointTrajectory
+### Track Trajectory Server
 
 [:top: Back to Top.](#cartwheeling-serial-link-action-server)
 
