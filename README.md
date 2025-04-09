@@ -171,6 +171,11 @@ This node contains the `FollowJointTrajectory` action, so you can move the robot
     <img src="doc/follow_transform_server.png" width="500" height="auto">
 </p>
 
+<p align="center">
+    <img src="doc/follow_transform.gif" width="600" height="auto">
+</p>
+
+
 ### Follow Twist Server
 
 This node contains the `FollowJointTrajectory` action, so you can move the robot in to different joint configurations, and the `FollowTwist` action. Using the latter's matching client, you send a goal with the topic name for a `geometry_msgs::msg::TwistStamped` message that is being published somehow over the ROS2 network. The action client will subscribe to this topic, and move the endpoint of the robot at the given speed.
@@ -179,12 +184,21 @@ This node contains the `FollowJointTrajectory` action, so you can move the robot
     <img src="doc/follow_twist_server.png" width="600" height="auto">
 </p>
 
+<p align="center">
+    <img src="doc/follow_twist.gif" width="600" height="auto">
+</p>
+
+
 ### Track Trajectory Server
 
 This node contains the `FollowJointTrajectory` action, and the `FollowCartesianTrajectory` action. Using the former, you can move the robot in to different joint configurations. Using the latter, you can make the endpoint follow a trajectory defined by a series of `serial_link_interfaces::msg::CartesianTrajectoryPoint`s. The actions erver takes these waypoints and fits a spline to them, and performs feedback control to follow it.
 
 <p align="center">
     <img src="doc/track_trajectory_server.png" width="350" height="auto">
+</p>
+
+<p align="center">
+    <img src="doc/track_trajectory.gif" width="600" height="auto">
 </p>
 
 [:top: Back to Top.](#cartwheeling-serial-link-action-server)
