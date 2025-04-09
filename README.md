@@ -156,7 +156,7 @@ def generate_launch_description():
         parameters = ['config/control_parameters.yaml')],
         arguments  = ['urdf/robot.urdf'),                     # URDF location
                      'end_effector',                          # Endpoint name
-                     'joint_command_relay',                   # Topic to publish joint commands to
+                     'joint_commands',                        # Topic to publish joint commands to
                      'joint_state']                           # Joint state topic to subscribe to
     )
 
@@ -165,15 +165,46 @@ def generate_launch_description():
 
 ### Follow Transform Server
 
+This node contains the `FollowJointTrajectory` action, so you can move the robot in to different joint configurations, and the `FollowTransform` action. With the latter, you use a corresponding client to tell the server the `frame_id` of a `tf2_ros::Transform` that is broadcast somehow over the network. The server listens for this transform, and performs feedback control to align the robot endpoint pose with it.
+
+<p align="center">
+    <img src="doc/follow_transform_server.png" width="600" height="auto">
+</p>
+
 ### Follow Twist Server
 
+This node contains the `FollowJointTrajectory` action, so you can move the robot in to different joint configurations, and the `FollowTwist` action. Using the latter's matching client, you send a goal with the topic name for a `geometry_msgs::msg::TwistStamped` message that is being published somehow over the ROS2 network. The action client will subscribe to this topic, and move the endpoint of the robot at the given speed.
+
+<p align="center">
+    <img src="doc/follow_twist_server.png" width="600" height="auto">
+</p>
+
 ### Track Trajectory Server
+
+This node contains the `FollowJointTrajectory` action, and the `FollowCartesianTrajectory` action. Using the former, you can move the robot in to different joint configurations. Using the latter, you can make the endpoint follow a trajectory defined by a series of `serial_link_interfaces::msg::CartesianTrajectoryPoint`s. The actions erver takes these waypoints and fits a spline to them, and performs feedback control to follow it.
+
+<p align="center">
+    <img src="doc/trajectory_tracking_server.png" width="600" height="auto">
+</p>
 
 [:top: Back to Top.](#cartwheeling-serial-link-action-server)
 
 ## :package: Release Notes - v1.0.0 (April 2025)
 
-To do.
+#### :tada: First Release:
+
+**Classes:**
+- ActionServerBase (templated)
+- FollowTransform
+- FollowTwist
+- ModelUpdater
+- TrackCartesianTrajectory
+- TrackJointTrajectory
+
+**Nodes:**
+- follow_transform_server
+- follow_twist_server
+- track_trajectory_server
  
 [:top: Back to Top.](#cartwheeling-serial-link-action-server)
 
