@@ -11,7 +11,7 @@ This package contains [ROS2 action servers](https://design.ros2.org/articles/act
 #### :compass: Navigation
 - [Requirements](#clipboard-requirements)
 - [Installation](#floppy_disk-installation)
-- [Usage](#wrench-usage)
+- [Classes](#card_file_box-classes)
 - [Nodes](#satellite-nodes)
 - [Release Notes](#package-release-notes---v100-april-2025)
 - [Contributing](#handshake-contributing)
@@ -81,33 +81,87 @@ If you scroll down the list, you should see both `serial_link_action_server`, an
 
 [:top: Back to Top.](#cartwheeling-serial-link-action-server)
 
-## :wrench: Usage
+## :card_file_box: Classes
 
-> [!TIP]
-> Check out my [Kuka iiwa14 velocity control package](https://github.com/Woolfrey/control_kuka_velocity) on how to get the action server(s) up and running.
+This repository contains several classes that implement action servers for the actions specified in the [interface repository](https://github.com/Woolfrey/interface_serial_link).
 
-> [!NOTE]
-> The actions have been fully implemented, and all you have to do is run / launch the action server nodes provided in this package. But you can also inherit the `ActionServerBase` class to implement your own methods.
+<p align="center">
+    <img src="doc/diagram.png" width="700" height="auto"/>
+</p>
 
-You can always write your own [action server from scratch](https://docs.ros.org/en/foxy/Tutorials/Intermediate/Writing-an-Action-Server-Client/Cpp.html). But if you build upon the `ActionServerBase` class provided in this package you need to:
+- A `RobotLibrary::Model::KinematicTree` object is used to compute the forward kinematics & inverse dynamics of the robot.
+- A `ModelUpdater` node subscribes to a `sensor_msgs::msg::JointState` topic and update the `KinematicTree` as messages are received.
+- A `RobotLibrary::Control::SerialLinkBase` object uses the model to control a branch on the `KinematicTree`.
+- The `ActionServerBase` is a templated class that provides a standardised structure & interface for all derived classes.
+- The derived classes, e.g. `FollowTransform`, `FollowJointTrajectory`, use the `SerialLinkBase` object to implement the control loop in order to perform the desired action.
 
-1. Define the `handle_goal`, and `execute` methods, and
-2. Create an executable, attach a node, and spin.
-
-> [!NOTE]
-> The `handle_cancel` and `handle_accepted` are defined in the `ActionServerBase` and can always be overridden with custom methods.
-
-_Multiple_ actions can be attached to the server node, so a robot can perform complex tasks.
-
-To make an action server node work we need:
-1. A `RobotLibrary::Model::KinematicTree` object which is attached to the
-2. `serial_link_action_server::ModelUpdater` node,
-3. A `RobotLibrary::Control` object, and
-4. A `std::mutex` to stop 2 actions using the robot at the same time.
+[:top: Back to Top.](#cartwheeling-serial-link-action-server)
 
 ## :satellite: Nodes
 
-This package contains nodes with pre-configured actions that you can use. Of course, you can easily make your own, and mix-and-match different actions to suit your own task.
+This package contains nodes with pre-configured actions that you can use. Of course, you can easily make your own, and mix-and-match different actions to suit your own task. Just follow the diagram above, or check how the nodes are written in the `src/nodes/` directory.
+
+Each node requires 4 arguments:
+1. A path to a valid URDF file,
+2. The name of the endpoint link to be controlled,
+3. The name of the topic to publish the `serial_link_interfaces::msg::JointCommand` message, and
+4. The name of the `sensor_msgs::msg::JointState` topic to subscribe to.
+
+There is also parameters for the `RobotLibrary::Control::SerialLinkBase` that can be loaded via a `.YAML` file:
+
+```
+/**:
+    ros__parameters:
+
+        # These are for the RobotLibrary::Control class(es):
+        cartesian_damping: [10.0,  0.0,  0.0, 0.0, 0.0, 0.0,
+                             0.0, 10.0,  0.0, 0.0, 0.0, 0.0,
+                             0.0,  0.0, 10.0, 0.0, 0.0, 0.0,
+                             0.0,  0.0,  0.0, 1.0, 0.0, 0.0,
+                             0.0,  0.0,  0.0, 0.0, 1.0, 0.0,
+                             0.0,  0.0,  0.0, 0.0, 0.0, 1.0]
+        cartesian_stiffness: [200.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+                                0.0, 200.0,   0.0,   0.0,   0.0,   0.0,
+                                0.0,   0.0, 200.0,   0.0,   0.0,   0.0,
+                                0.0,   0.0,   0.0, 100.0,   0.0,   0.0,
+                                0.0,   0.0,   0.0,   0.0, 100.0,   0.0,
+                                0.0,   0.0,   0.0,   0.0,   0.0, 100.0]
+        frequency: 500.0
+        joint_position_gain: 50.0
+        joint_velocity_gain:  10.0
+        manipulability_threshold: 0.001
+        max_joint_acceleration: 10.0
+
+        # These are for the underlying QPSolver class:
+        initial_barrier_scalar: 500.0
+        barrier_reduction_rate: 0.001
+        step_size_tolerance: 0.05
+        max_steps: 10
+```
+
+The best way to run the node is using a launch file, for example `trajectory_tracking.py` might look like:
+
+```
+import os
+from launch import LaunchDescription
+from launch_ros.actions import Node
+
+def generate_launch_description():
+
+    trajectory_tracking = Node(
+        package    = 'serial_link_action_server',
+        executable = 'trajectory_tracking_server',
+        name       = 'trajectory_tracking_server',
+        output     = 'screen',
+        parameters = ['config/control_parameters.yaml')],
+        arguments  = ['urdf/robot.urdf'),                     # URDF location
+                     'end_effector',                          # Endpoint name
+                     'joint_command_relay',                   # Topic to publish joint commands to
+                     'joint_state']                           # Joint state topic to subscribe to
+    )
+
+    return LaunchDescription([trajectory_tracking])
+```
 
 ### Follow Transform Server
 
