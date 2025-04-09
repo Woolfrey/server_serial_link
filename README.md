@@ -168,7 +168,7 @@ def generate_launch_description():
 This node contains the `FollowJointTrajectory` action, so you can move the robot in to different joint configurations, and the `FollowTransform` action. With the latter, you use a corresponding client to tell the server the `frame_id` of a `tf2_ros::Transform` that is broadcast somehow over the network. The server listens for this transform, and performs feedback control to align the robot endpoint pose with it.
 
 <p align="center">
-    <img src="doc/follow_transform_server.png" width="600" height="auto">
+    <img src="doc/follow_transform_server.png" width="500" height="auto">
 </p>
 
 ### Follow Twist Server
@@ -184,14 +184,14 @@ This node contains the `FollowJointTrajectory` action, so you can move the robot
 This node contains the `FollowJointTrajectory` action, and the `FollowCartesianTrajectory` action. Using the former, you can move the robot in to different joint configurations. Using the latter, you can make the endpoint follow a trajectory defined by a series of `serial_link_interfaces::msg::CartesianTrajectoryPoint`s. The actions erver takes these waypoints and fits a spline to them, and performs feedback control to follow it.
 
 <p align="center">
-    <img src="doc/trajectory_tracking_server.png" width="600" height="auto">
+    <img src="doc/track_trajectory_server.png" width="350" height="auto">
 </p>
 
 [:top: Back to Top.](#cartwheeling-serial-link-action-server)
 
 ## :package: Release Notes - v1.0.0 (April 2025)
 
-#### :tada: First Release:
+### :tada: First Release:
 
 **Classes:**
 - ActionServerBase (templated)
