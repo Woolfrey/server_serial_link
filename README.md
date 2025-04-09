@@ -83,7 +83,7 @@ If you scroll down the list, you should see both `serial_link_action_server`, an
 
 ## :card_file_box: Classes
 
-This repository contains several classes that implement action servers for the actions specified in the [interface repository](https://github.com/Woolfrey/interface_serial_link).
+This package contains several classes that implement action servers for the actions specified in the [interface repository](https://github.com/Woolfrey/interface_serial_link). The diagram below shows how the classes and nodes are organised in an executable to control a robot:
 
 <p align="center">
     <img src="doc/diagram.png" width="700" height="auto"/>
@@ -101,7 +101,7 @@ This repository contains several classes that implement action servers for the a
 
 This package contains nodes with pre-configured actions that you can use. Of course, you can easily make your own, and mix-and-match different actions to suit your own task. Just follow the diagram above, or check how the nodes are written in the `src/nodes/` directory.
 
-Each node requires 4 arguments:
+Each executable requires 4 arguments:
 1. A path to a valid URDF file,
 2. The name of the endpoint link to be controlled,
 3. The name of the topic to publish the `serial_link_interfaces::msg::JointCommand` message, and
