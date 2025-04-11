@@ -15,6 +15,7 @@ This package contains [ROS2 action servers](https://design.ros2.org/articles/act
 - [Nodes](#satellite-nodes)
 - [Release Notes](#package-release-notes---v100-april-2025)
 - [Contributing](#handshake-contributing)
+- [Citing this Repository](#bookmark_tabs-citing-this-repository)
 - [License](#scroll-license)
 
 ## :clipboard: Requirements
@@ -224,9 +225,34 @@ This node contains the `FollowJointTrajectory` action, and the `FollowCartesianT
 
 ## :handshake: Contributing
 
-Contributions are always welcome. Feel free to fork the repository, make changes, and issue a pull request.
+Contributions to this repositore are welcome! Feel free to:
+1. Fork the repository,
+2. Implement your changes / improvements, then
+3. Issue a pull request.
 
-You can also raise an issue asking for new features.
+If you're looking for ideas, you can always check the [Issues tab](https://github.com/Woolfrey/server_serial_link/issues) for those with :raising_hand: [OPEN]. These are things I'd like to implement, but don't have time for. It'd be much appreciated, and you'll be tagged as a contributor :sunglasses:
+
+[:top: Back to Top.](#cartwheeling-serial-link-action-server)
+
+## :bookmark_tabs: Citing this Repository
+
+If you find this code useful, spread the word by acknowledging it. Click on `Cite this repository` under the **About** section in the top-right corner of this page :arrow_upper_right:.
+
+Here's a BibTeX reference:
+```
+@software{woolfrey_serial_link_action_server_2005
+     author  = {Woolfrey, Jon},
+     month   = apr,
+     title   = {{S}erial {L}ink {A}ction {S}erver},
+     url     = {https://github.com/Woolfrey/server_serial_link},
+     version = {1.0.0},
+     year    = {2025}
+}
+```
+Here's the automatically generated APA format:
+```
+Woolfrey, J. (2025). Serial Link Action Server (Version 1.0.0). Retrieved from https://github.com/Woolfrey/server_serial_link
+```
 
 [:top: Back to Top.](#cartwheeling-serial-link-action-server)
 
