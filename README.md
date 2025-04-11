@@ -230,7 +230,7 @@ Contributions to this repositore are welcome! Feel free to:
 2. Implement your changes / improvements, then
 3. Issue a pull request.
 
-If you're looking for ideas, you can always check the [Issues tab](https://github.com/Woolfrey/software_template/issues) for those with :raising_hand: [OPEN]. These are things I'd like to implement, but don't have time for. It'd be much appreciated, and you'll be tagged as a contributor :sunglasses:
+If you're looking for ideas, you can always check the [Issues tab](https://github.com/Woolfrey/server_serial_link/issues) for those with :raising_hand: [OPEN]. These are things I'd like to implement, but don't have time for. It'd be much appreciated, and you'll be tagged as a contributor :sunglasses:
 
 [:top: Back to Top.](#cartwheeling-serial-link-action-server)
 
