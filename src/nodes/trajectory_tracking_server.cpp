@@ -49,12 +49,12 @@ int main(int argc, char **argv)
     std::string endpointName    = argv[2];
     std::string controlTopic    = argv[3];
     std::string jointStateTopic = argv[4];
-        
+ 
     try 
     {
         auto model = std::make_shared<RobotLibrary::Model::KinematicTree>(urdfPath);                // Generate dynamic model
         
-        auto modelUpdaterNode = std::make_shared<ModelUpdater>(model, jointStateTopic);             // Create node for updating joint state
+        auto modelUpdaterNode = std::make_shared<ModelUpdater>(model, jointStateTopic, endpointName); // Create node for updating joint state
         
         auto serverNode = std::make_shared<rclcpp::Node>(model->name()+"_action_server");           // Create action server nodes
         
