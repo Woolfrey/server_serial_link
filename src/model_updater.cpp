@@ -33,42 +33,15 @@ ModelUpdater::ModelUpdater(std::shared_ptr<RobotLibrary::Model::KinematicTree> m
   _endpointName(endpointName)
 {  
     _subscription = this->create_subscription<JointState>(topicName, 1, std::bind(&ModelUpdater::update, this, std::placeholders::_1));
-
-    _transformBroadcaster = std::make_shared<tf2_ros::TransformBroadcaster>(this);
-          
+  
     // Set initial state
     _model->update_state(Eigen::VectorXd::Zero(model->number_of_joints()),
                          Eigen::VectorXd::Zero(model->number_of_joints()));      
-    
-    // Look up the endpoint frame
-    try
-    {
-        _endpointFrame = _model->find_frame(endpointName);
-    }
-    catch (const std::exception &exception)
-    {
-        RCLCPP_WARN(this->get_logger(), exception.what());
-    }
-    
-    // Save these since they're fixed
-    _transform.header.frame_id = _model->base.name();
-    _transform.child_frame_id  = _endpointName;
-    
-    if (not (_endpointFrame->link == nullptr))
-    {
-        RCLCPP_INFO(this->get_logger(),
-                    "Initiated the model updater node for the `%s`. "
-                    "Subscribing to the `%s` joint state topic. "
-                    "Publishing transform for the `%s` frame.",
-                    _model->name().c_str(), topicName.c_str(), _endpointName.c_str());
-    }
-    else
-    {
-        RCLCPP_INFO(this->get_logger(),
-                    "Initiated the model updater node for the `%s`. "
-                    "Subscribing to the `%s` joint state topic.",
-                    _model->name().c_str(), topicName.c_str());
-    }
+
+    RCLCPP_INFO(this->get_logger(),
+                "Initiated the model updater node for the `%s`. "
+                "Subscribing to the `%s` joint state topic.",
+                _model->name().c_str(), topicName.c_str());
 }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -95,24 +68,6 @@ ModelUpdater::update(const JointState &state)
         RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000, exception.what());
         
         return;
-    }
-    
-    // Publish endpoint transform:
-    if (not(_endpointFrame == nullptr))
-    {
-        _transform.header.stamp = this->now();                                                      // Add current time stamp
-        
-        // Transfer the pose
-        _transform.transform.translation.x = _endpointFrame->link->pose().translation()[0];
-        _transform.transform.translation.y = _endpointFrame->link->pose().translation()[1];
-        _transform.transform.translation.z = _endpointFrame->link->pose().translation()[2];
-        
-        _transform.transform.rotation.w = _endpointFrame->link->pose().quaternion().w();
-        _transform.transform.rotation.x = _endpointFrame->link->pose().quaternion().x();
-        _transform.transform.rotation.y = _endpointFrame->link->pose().quaternion().y();
-        _transform.transform.rotation.z = _endpointFrame->link->pose().quaternion().z();
-            
-        _transformBroadcaster->sendTransform(_transform);
     }
 }
 
