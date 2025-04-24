@@ -36,7 +36,31 @@ TrackCartesianTrajectory::TrackCartesianTrajectory(std::shared_ptr<rclcpp::Node>
                    actionName,
                    controlTopicName)
 {
-    _feedback->header.frame_id = _controller->model()->base_name();
+    _feedback->header.frame_id = _controller->model()->base_name();                                 // Save this
+    
+    // Create publishers for RViz
+    _pathPublisher    = node->create_publisher<visualization_msgs::msg::Marker>("cartesian_path", 1);
+    _wayposePublisher = node->create_publisher<visualization_msgs::msg::MarkerArray>("waypose_markers", 1);
+    
+    // Set static properties for arrows in RViz
+    _arrowMarker.action          = visualization_msgs::msg::Marker::ADD;
+    _arrowMarker.color.a         = _node->declare_parameter<double>("cartesian_trajectory.waypose.alpha", 1.0);
+    _arrowMarker.header.frame_id = _controller->model()->base_name();
+    _arrowMarker.ns              = "cartesian_trajectory_waypose";
+    _arrowMarker.scale.x         = _node->declare_parameter<double>("cartesian_trajectory.waypose.scale", 0.015);
+    _arrowMarker.scale.y         = _node->declare_parameter<double>("cartesian_trajectory.waypose.shaft_diameter", 0.005);
+    _arrowMarker.scale.z         = _node->declare_parameter<double>("cartesian_trajectory.waypose.head_diameter", 0.001);
+    _arrowMarker.type            = visualization_msgs::msg::Marker::ARROW;
+    
+    // Set static properties for path in RViz
+    _pathMarker.color.r         = 0.0;
+    _pathMarker.color.g         = 1.0;
+    _pathMarker.color.b         = 0.0;
+    _pathMarker.color.a         = 1.0;
+    _pathMarker.header.frame_id = _controller->model()->base_name();
+    _pathMarker.ns              = "cartesian_trajectory_path";
+    _pathMarker.scale.x         = 0.005;                                                            // Line width
+    _pathMarker.type            = visualization_msgs::msg::Marker::LINE_STRIP;
 }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////// 
@@ -47,7 +71,7 @@ TrackCartesianTrajectory::handle_goal(const rclcpp_action::GoalUUID &uuid,
                                       std::shared_ptr<const Action::Goal> goal)
 {
     (void)uuid;                                                                                     // Prevents colcon from throwing a warning
-    
+       
     // Ensure arguments are sound
     if(goal->position_tolerance <= 0.0
     or goal->orientation_tolerance <= 0.0)
@@ -75,6 +99,8 @@ TrackCartesianTrajectory::handle_goal(const rclcpp_action::GoalUUID &uuid,
     poses.reserve(goal->points.size()+1);                                                           // Reserve space for efficiency
     poses.emplace_back(_controller->endpoint_pose());                                               // First pose is current endpoint
     
+    _wayposeMarkers.markers.clear();                                                                // (Re)set
+    
     // Iterate over the poses in the request
     for(const auto &point : goal->points)
     {
@@ -90,16 +116,56 @@ TrackCartesianTrajectory::handle_goal(const rclcpp_action::GoalUUID &uuid,
                                          point.pose.orientation.z};
        
        // Check the frame of reference
-            if(point.reference_frame == 0) poses.emplace_back(RobotLibrary::Model::Pose(translation,quaternion));// In base frame
+            if(point.reference_frame == 0) poses.emplace_back(RobotLibrary::Model::Pose(translation,quaternion)); // In base frame
        else if(point.reference_frame == 1) poses.emplace_back(poses.back()*RobotLibrary::Model::Pose(translation,quaternion)); // In current endpoint frame; transform to base
        else if(point.reference_frame == 2)                                                          // Pose is relative to endpoint frame, but in base frame coordinates
        {
             translation = poses.back().translation() + translation;                                 // Add the translation
-            quaternion  = poses.back().quaternion()*quaternion;                                     // Add the rotation
+            quaternion  = poses.back().quaternion() * quaternion;                                   // Add the rotation
             poses.emplace_back(RobotLibrary::Model::Pose(translation,quaternion));
        }
-   }
-   
+       
+        // Create arrows to show wayposes in RViz
+        size_t base_id = poses.size() * 3;                                                          // Ensures unique IDs for each pose (3 arrows per pose)
+
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            visualization_msgs::msg::Marker arrow = _arrowMarker;                                   // Transfer static propertiess
+            arrow.header.stamp = _node->now();                                                      // Stamp it with current time
+            arrow.id           = base_id + axis;                                                    // Each marker needs a unique ID
+            arrow.lifetime     = rclcpp::Duration::from_seconds(point.time);                        // Length of time to visualise for
+            
+            Eigen::Matrix3d rotationMatrix = quaternion.matrix();                                   // Convert to 3x3 matrix               
+            
+            switch (axis)
+            {
+                case 0: arrow.color.r = 1.0; arrow.color.g = 0.0; arrow.color.b = 0.0; break;
+                case 1: arrow.color.r = 0.0; arrow.color.g = 1.0; arrow.color.b = 0.0; break;
+                case 2: arrow.color.r = 0.0; arrow.color.g = 0.0; arrow.color.b = 1.0; break;
+            }
+
+            geometry_msgs::msg::Point start, end;
+            
+            start.x = translation.x();
+            start.y = translation.y();
+            start.z = translation.z();
+            
+            arrow.points.push_back(start);
+
+            double length = 0.10;
+            
+            end.x = start.x + rotationMatrix.col(axis).x() * length;
+            end.y = start.y + rotationMatrix.col(axis).y() * length;
+            end.z = start.z + rotationMatrix.col(axis).z() * length;
+             
+            arrow.points.push_back(end);
+
+            _wayposeMarkers.markers.push_back(arrow);
+        }
+    }
+    
+    _wayposePublisher->publish(_wayposeMarkers);                                                    // Visualise markers
+    
     // Try to create the trajectory
     try
     {
@@ -111,6 +177,27 @@ TrackCartesianTrajectory::handle_goal(const rclcpp_action::GoalUUID &uuid,
         
         return rclcpp_action::GoalResponse::REJECT;
     }
+    
+    // Sample trajectory and display path
+    _pathMarker.action = visualization_msgs::msg::Marker::ADD;
+    _pathMarker.lifetime = rclcpp::Duration::from_seconds(_trajectory.end_time());
+    _pathMarker.points.clear();                                                                     // (Re)set the array
+    
+    double dt = 0.1;                                                                                // Discrete time step
+    
+    for (int i = 0; i < (int)(_trajectory.end_time()/dt); ++i)
+    {
+        auto translation = _trajectory.query_state(i*dt).pose.translation();                        // Sample the trajectory
+        
+        geometry_msgs::msg::Point point;
+        point.x = translation.x();
+        point.y = translation.y();
+        point.z = translation.z();
+        
+        _pathMarker.points.push_back(point);
+    }
+    
+    _pathPublisher->publish(_pathMarker);                                                           // Visualise the path
     
     // Make sure no other action is using the robot
     if(not _mutex->try_lock())
@@ -147,6 +234,7 @@ TrackCartesianTrajectory::execute(const std::shared_ptr<GoalHandle> goalHandle)
         if (goalHandle->is_canceling())
         {
             cleanup_and_send_result(2, "Cartesian trajectory tracking cancelled.", goalHandle);
+            
             return;
         }
         
@@ -244,7 +332,20 @@ TrackCartesianTrajectory::cleanup_and_send_result(const int &status,
     result->position_error = _positionError;
     result->orientation_error = _orientationError;
     result->message = message;
+ 
+    // Delete any poses that are remaining
+    for (auto &marker : _wayposeMarkers.markers)
+    {
+        marker.action = visualization_msgs::msg::Marker::DELETE;
+        marker.header.stamp = _node->now();                                                         // always stamp with now
+    }
+    _wayposePublisher->publish(_wayposeMarkers);
     
+    // Delete any path that is remaining
+    _pathMarker.action = visualization_msgs::msg::Marker::DELETE;
+    _pathMarker.header.stamp = _node->now();
+    _pathPublisher->publish(_pathMarker);
+       
     switch(status)
     {
         case 1:                                                                                     // Successfully completed
@@ -260,14 +361,14 @@ TrackCartesianTrajectory::cleanup_and_send_result(const int &status,
             break;
         }
         case 3:                                                                                     // Aborted
-        {
+        {    
             goalHandle->abort(result);
             RCLCPP_ERROR(_node->get_logger(), "Cartesian trajectory tracking aborted.");
             break;
         }
     }
 
-    _mutex->unlock();                                                                             // Release control
+    _mutex->unlock();                                                                               // Release control
 }
 
 }

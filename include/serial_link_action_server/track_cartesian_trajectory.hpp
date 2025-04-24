@@ -26,6 +26,7 @@
 #include <serial_link_action_server/action_server_base.hpp>
 #include <serial_link_action_server/utilities.hpp>
 #include <serial_link_interfaces/action/track_cartesian_trajectory.hpp>                             // Custom generated action
+#include <visualization_msgs/msg/marker_array.hpp>
 
 namespace serial_link_action_server {
 
@@ -56,12 +57,22 @@ class TrackCartesianTrajectory : public ActionServerBase<serial_link_interfaces:
     
     private:
 
+        rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr _wayposePublisher;       ///< Visualises points on the trajectory
+        
+        rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr _pathPublisher;               ///< Visualises the path taken by the end-effector
+        
         serial_link_interfaces::msg::Statistics _orientationError;                                  ///< Statistical summary of orientation tracking performance
         
         serial_link_interfaces::msg::Statistics _positionError;                                     ///< Statistical summary of position tracking performance
        
         RobotLibrary::Trajectory::CartesianSpline _trajectory;                                      ///< Trajectory generator
 
+        visualization_msgs::msg::Marker _arrowMarker;                                               ///< Default properties for arrows
+        
+        visualization_msgs::msg::Marker _pathMarker;                                                ///< For plotting the Cartesian path
+        
+        visualization_msgs::msg::MarkerArray _wayposeMarkers;                                       ///< Stores wayposes
+        
         /**
          * @brief Processes the request to execute action.
          * @param uuid I have no idea what this does ¯\_(ツ)_/¯

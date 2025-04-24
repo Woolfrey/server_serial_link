@@ -37,6 +37,21 @@ FollowTwist::FollowTwist(std::shared_ptr<rclcpp::Node> node,
   _transformListener(_transformBuffer)                                                              // Attach listener to buffer
 {
     _feedback->header.frame_id = _controller->model()->base_name();                                 // Save this
+    
+    _markerArrayPublisher = _node->create_publisher<visualization_msgs::msg::MarkerArray>("twist_markers",1);
+    
+    // Set static properties for marker(s)
+    _defaultMarker.color.r         = 0.0;
+    _defaultMarker.color.g         = 0.0;
+    _defaultMarker.color.b         = 1.0;
+    _defaultMarker.color.a         = 1.0;
+    _defaultMarker.header.frame_id = _controller->model()->base_name();
+    _defaultMarker.id              = 0;
+    _defaultMarker.lifetime        = rclcpp::Duration::from_seconds(0.2);
+    _defaultMarker.scale.x         = 0.02;
+    _defaultMarker.scale.y         = 0.04;
+    _defaultMarker.scale.z         = 0.06;
+    _defaultMarker.type            = visualization_msgs::msg::Marker::ARROW;
 }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////// 
@@ -50,7 +65,8 @@ FollowTwist::handle_goal(const rclcpp_action::GoalUUID &uuid, std::shared_ptr<co
     RCLCPP_INFO(_node->get_logger(), "Received request to follow twist.");                          // Inform the user
     
     // Ensure arguments are sound
-    if(goal->linear_tolerance  <= 0.0 or goal->angular_tolerance <= 0.0)
+    if(goal->linear_tolerance  <= 0.0
+    or goal->angular_tolerance <= 0.0)
     {
         RCLCPP_WARN(_node->get_logger(),
                     "Velocity error tolerances were not positive. "
@@ -70,6 +86,7 @@ FollowTwist::handle_goal(const rclcpp_action::GoalUUID &uuid, std::shared_ptr<co
     else if(_node->count_publishers(goal->topic_name) == 0)
     {
         RCLCPP_WARN(_node->get_logger(), "No publishers found on topic '%s'.", goal->topic_name.c_str());
+        
         return rclcpp_action::GoalResponse::REJECT;
     }
       
@@ -83,14 +100,6 @@ FollowTwist::handle_goal(const rclcpp_action::GoalUUID &uuid, std::shared_ptr<co
     _angularError.variance = 0.0;
     _angularError.min = std::numeric_limits<double>::max();
     
-    // Make sure no other action is using the robot
-    if(not _mutex->try_lock())
-    {
-        RCLCPP_WARN(_node->get_logger(), "Another action is currently using the robot.");
-        
-        return rclcpp_action::GoalResponse::REJECT;
-    }
-    
     // Create the subscriber
     _twistSubscriber = _node->create_subscription<geometry_msgs::msg::TwistStamped>
     (
@@ -101,6 +110,14 @@ FollowTwist::handle_goal(const rclcpp_action::GoalUUID &uuid, std::shared_ptr<co
     
     _lastTwistHeader.stamp = _node->now();
     _lastTwistHeader.frame_id = "unset";
+    
+    // Make sure no other action is using the robot
+    if(not _mutex->try_lock())
+    {
+        RCLCPP_WARN(_node->get_logger(), "Another action is currently using the robot.");
+        
+        return rclcpp_action::GoalResponse::REJECT;
+    }
 
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;                                         // Return success and continue to execution
 }
@@ -209,6 +226,45 @@ FollowTwist::execute(const std::shared_ptr<GoalHandle> goalHandle)
             update_statistics(_angularError, angularError, n);
             
             ++n;                                                                                    // Increment sample size
+            
+            // Publish visualisation data
+            Eigen::Vector3d endpointPosition = _controller->endpoint_pose().translation();
+            
+            visualization_msgs::msg::Marker desiredMarker = _defaultMarker;
+            desiredMarker.action = visualization_msgs::msg::Marker::ADD;
+            desiredMarker.header.stamp = _node->now();
+            desiredMarker.id = 0;
+ 
+            geometry_msgs::msg::Point start, end;
+    
+            start.x = endpointPosition.x();
+            start.y = endpointPosition.y();
+            start.z = endpointPosition.z();
+            
+            end.x = start.x + desiredTwist[0];
+            end.y = start.y + desiredTwist[1];
+            end.z = start.z + desiredTwist[2];
+
+            desiredMarker.points.push_back(start);
+            desiredMarker.points.push_back(end);
+            
+            visualization_msgs::msg::Marker actualMarker = desiredMarker;
+            actualMarker.color.r = 0.0; actualMarker.color.g = 1.0; actualMarker.color.b = 0.0;
+            actualMarker.id = 1;
+            
+            end.x = start.x + actualTwist[0];
+            end.y = start.y + actualTwist[1];
+            end.z = start.z + actualTwist[2];
+
+            actualMarker.points.clear();
+            actualMarker.points.push_back(start);
+            actualMarker.points.push_back(end);          
+            
+            // Add to array
+            _markerArray.markers.clear();
+            _markerArray.markers.push_back(desiredMarker);
+            _markerArray.markers.push_back(actualMarker);
+            _markerArrayPublisher->publish(_markerArray);
             
             // Check tolerances
             if (linearError > goal->linear_tolerance)
