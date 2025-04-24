@@ -25,6 +25,7 @@
    <depend>rclcpp_action</depend> 
    <depend>sensor_msgs</depend>
    <depend>std_msgs</depend>
+   <depend>visualization_msgs</depend>
 
     <!-- Other packages -->
     <build_depend>serial_link_interfaces</build_depend>
