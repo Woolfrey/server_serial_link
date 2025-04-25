@@ -292,10 +292,7 @@ FollowTwist::execute(const std::shared_ptr<GoalHandle> goalHandle)
         }
     }
     
-    _twistSubscriber.reset();                                                                       // Stop subscriber to free up resources
-    
-    // Technically, this should never be called.
-    cleanup_and_send_result(1, "Follow twist completed.", goalHandle);
+    cleanup_and_send_result(1, "Follow twist completed.", goalHandle);                              // Technically, this should never be called.
 }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -323,7 +320,9 @@ FollowTwist::cleanup_and_send_result(const int &status,
                                      const std::shared_ptr<GoalHandle> goalHandle)
 {
     publish_joint_command(Eigen::VectorXd::Zero(_numJoints));                                       // Ensure the last command is zero
-            
+      
+    _twistSubscriber.reset();                                                                       // Stop subscriber to free up resources      
+    
     // Assign data to the result section of the actions
     auto result = std::make_shared<Action::Result>();                                               // Result portion of the message
     result->linear_error = _linearError;
