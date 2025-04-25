@@ -13,7 +13,6 @@ This package contains [ROS2 action servers](https://design.ros2.org/articles/act
 - [Installation](#floppy_disk-installation)
 - [Classes](#card_file_box-classes)
 - [Nodes](#satellite-nodes)
-- [Release Notes](#package-release-notes---v100-april-2025)
 - [Contributing](#handshake-contributing)
 - [Citing this Repository](#bookmark_tabs-citing-this-repository)
 - [License](#scroll-license)
@@ -195,25 +194,6 @@ This node contains the `FollowJointTrajectory` action, and the `FollowCartesianT
     <img src="doc/track_trajectory.gif" width="600" height="auto">
 </p>
 
-[:top: Back to Top.](#cartwheeling-serial-link-action-server)
-
-## :package: Release Notes - v1.0.0 (April 2025)
-
-### :tada: First Release:
-
-**Classes:**
-- ActionServerBase (templated)
-- FollowTransform
-- FollowTwist
-- ModelUpdater
-- TrackCartesianTrajectory
-- TrackJointTrajectory
-
-**Nodes:**
-- follow_transform_server
-- follow_twist_server
-- track_trajectory_server
- 
 [:top: Back to Top.](#cartwheeling-serial-link-action-server)
 
 ## :handshake: Contributing
