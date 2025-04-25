@@ -39,13 +39,6 @@ ros2_workspace/
 └── src/
     ├── interface_serial_link/
     └── server_serial_link/
-        ├── doc/
-        ├── include/
-        ├── src/
-        ├── CMakeLists.txt
-        ├── LICENSE
-        ├── package.xml
-        └── README.md
 ```
 
 1. In the `src/` directory of your ROS2 workspace, clone the interfaces repository:
@@ -87,7 +80,7 @@ If you scroll down the list, you should see both `serial_link_action_server`, an
 This package contains several classes that implement action servers for the actions specified in the [interface repository](https://github.com/Woolfrey/interface_serial_link). The diagram below shows how the classes and nodes are organised in an executable to control a robot:
 
 <p align="center">
-    <img src="doc/diagram.png" width="700" height="auto"/>
+    <img src="doc/server_overview.png" width="700" height="auto"/>
 </p>
 
 - A `RobotLibrary::Model::KinematicTree` object is used to compute the forward kinematics & inverse dynamics of the robot.
@@ -169,7 +162,7 @@ def generate_launch_description():
 This node contains the `FollowJointTrajectory` action, so you can move the robot in to different joint configurations, and the `FollowTransform` action. With the latter, you use a corresponding client to tell the server the `frame_id` of a `tf2_ros::Transform` that is broadcast somehow over the network. The server listens for this transform, and performs feedback control to align the robot endpoint pose with it.
 
 <p align="center">
-    <img src="doc/follow_transform_server.png" width="500" height="auto">
+    <img src="doc/follow_transform.png" width="500" height="auto">
 </p>
 
 <p align="center">
@@ -182,7 +175,7 @@ This node contains the `FollowJointTrajectory` action, so you can move the robot
 This node contains the `FollowJointTrajectory` action, so you can move the robot in to different joint configurations, and the `FollowTwist` action. Using the latter's matching client, you send a goal with the topic name for a `geometry_msgs::msg::TwistStamped` message that is being published somehow over the ROS2 network. The action client will subscribe to this topic, and move the endpoint of the robot at the given speed.
 
 <p align="center">
-    <img src="doc/follow_twist_server.png" width="600" height="auto">
+    <img src="doc/follow_twist.png" width="600" height="auto">
 </p>
 
 <p align="center">
@@ -195,7 +188,7 @@ This node contains the `FollowJointTrajectory` action, so you can move the robot
 This node contains the `FollowJointTrajectory` action, and the `FollowCartesianTrajectory` action. Using the former, you can move the robot in to different joint configurations. Using the latter, you can make the endpoint follow a trajectory defined by a series of `serial_link_interfaces::msg::CartesianTrajectoryPoint`s. The actions erver takes these waypoints and fits a spline to them, and performs feedback control to follow it.
 
 <p align="center">
-    <img src="doc/track_trajectory_server.png" width="350" height="auto">
+    <img src="doc/track_trajectory.png" width="350" height="auto">
 </p>
 
 <p align="center">
