@@ -26,6 +26,7 @@
 #include <tf2_ros/buffer.h>                                                                         // Stores transform chains
 #include <tf2_ros/transform_listener.h>                                                             // Gets transform
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#include <visualization_msgs/msg/marker_array.hpp>
 
 namespace serial_link_action_server {
 
@@ -61,9 +62,11 @@ class FollowTwist : public serial_link_action_server::ActionServerBase<serial_li
         
         geometry_msgs::msg::Vector3Stamped _linearVelocity;                                         ///< Received from the TwistStamped topic
         
-        rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr _twistSubscriber;
+        rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr _markerArrayPublisher;   ///< Visualisation in RViz
         
-        std_msgs::msg::Header _lastTwistHeader;
+        rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr _twistSubscriber;         ///< Retrieves Cartesian velocity commands
+        
+        std_msgs::msg::Header _lastTwistHeader;                                                     ///< Stores time to check for delays
         
         serial_link_interfaces::msg::Statistics _angularError;                                      ///< Statistical summary of orientation tracking performance
         
@@ -72,6 +75,10 @@ class FollowTwist : public serial_link_action_server::ActionServerBase<serial_li
         tf2_ros::Buffer _transformBuffer;                                                           ///< Stores transforms
         
         tf2_ros::TransformListener _transformListener;                                              ///< Updates buffer with TF messages
+
+        visualization_msgs::msg::Marker _defaultMarker;                                             ///< Default properties
+        
+        visualization_msgs::msg::MarkerArray _markerArray;                                          ///< Store & publish multiple
 
         /**
          * @brief Processes action requests from the server.

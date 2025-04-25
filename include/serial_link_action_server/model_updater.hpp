@@ -46,17 +46,11 @@ class ModelUpdater : public rclcpp::Node
         
     private:
 
-        geometry_msgs::msg::TransformStamped _transform;                                            ///< Object to be published
-        
         rclcpp::Subscription<JointState>::SharedPtr _subscription;                                  ///< This is the fundamental object
         
         std::shared_ptr<RobotLibrary::Model::KinematicTree> _model;                                 ///< Pointer to robot model.
 
-        std::shared_ptr<tf2_ros::TransformBroadcaster> _transformBroadcaster;                       ///< TF broadcaster for publishing transforms
-
         std::string _endpointName = "unspecified";                                                  ///< Need to save this
-        
-        RobotLibrary::Model::ReferenceFrame *_endpointFrame;                                        ///< Pointer to the endpoint frame on the model
                 
         /**
          * @brief Callback function that updates the kinematics & dynamics of the model.

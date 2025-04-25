@@ -25,6 +25,7 @@ find_package(std_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(visualization_msgs REQUIRED)
 
 # Other:
 find_package(Eigen3 REQUIRED)
@@ -57,7 +58,8 @@ ament_target_dependencies(trajectory_tracking_server "ament_cmake"
                                                      "std_msgs"
                                                      "tf2"
                                                      "tf2_ros"
-                                                     "tf2_geometry_msgs")
+                                                     "tf2_geometry_msgs"
+                                                     "visualization_msgs")
 
 # Follow twist:
 add_executable(follow_twist_server src/nodes/follow_twist_server.cpp
@@ -77,7 +79,8 @@ ament_target_dependencies(follow_twist_server "ament_cmake"
                                               "std_msgs"
                                               "tf2"
                                               "tf2_ros"
-                                              "tf2_geometry_msgs")
+                                              "tf2_geometry_msgs"
+                                              "visualization_msgs")
                                               
 # Follow transform:
 add_executable(follow_transform_server src/nodes/follow_transform_server.cpp
