@@ -20,7 +20,7 @@
 
 #include <serial_link_action_server/model_updater.hpp>
 
-namespace serial_link_action_server{
+namespace serial_link_action_server {
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                                          Constructor                                           //     
@@ -31,13 +31,29 @@ ModelUpdater::ModelUpdater(std::shared_ptr<RobotLibrary::Model::KinematicTree> m
 : Node(model->name() + "_model_updater"),
   _model(model),
   _endpointName(endpointName)
-{  
-    _subscription = this->create_subscription<JointState>(topicName, 1, std::bind(&ModelUpdater::update, this, std::placeholders::_1));
+{
+    _subscription = this->create_subscription<JointState>(topicName, 1, std::bind(&ModelUpdater::update, this, std::placeholders::_1));    
+    
+    RCLCPP_INFO(this->get_logger(), "Waiting for publishers on topic `%s`...", topicName.c_str());
+    
+    rclcpp::Rate rate(2);
+    
+    unsigned int count = 10;
+    
+    while (rclcpp::ok() and this->count_publishers(topicName) == 0 and count-- > 0)
+    {
+        rate.sleep();
+    }
+    
+    if (this->count_publishers(topicName) == 0)
+    {
+        RCLCPP_ERROR(this->get_logger(), "`%s` topic did not appear within 5 seconds of waiting.", topicName.c_str());
+        
+        rclcpp::shutdown();
+        
+        return;
+    }
   
-    // Set initial state
-    _model->update_state(Eigen::VectorXd::Zero(model->number_of_joints()),
-                         Eigen::VectorXd::Zero(model->number_of_joints()));      
-
     RCLCPP_INFO(this->get_logger(),
                 "Initiated the model updater node for the `%s`. "
                 "Subscribing to the `%s` joint state topic.",
