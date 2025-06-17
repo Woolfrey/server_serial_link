@@ -59,9 +59,9 @@ TrackJointTrajectory::handle_goal(const rclcpp_action::GoalUUID &uuid,
     (void)uuid;                                                                                     // Stops colcon from throwing a warning
     
     // Check tolerances
-    if(goal->tolerances.size() != _numJoints)
+    if(goal->tolerances.size() < _numJoints)
     {
-        RCLCPP_WARN(_node->get_logger(), "Tolerance on joint tracking error either not set, or set incorrectly.");
+        RCLCPP_WARN(_node->get_logger(), "Insufficient number of joint tolerances set for this robot.");
         
         return rclcpp_action::GoalResponse::REJECT;
     }
