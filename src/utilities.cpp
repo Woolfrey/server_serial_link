@@ -48,49 +48,34 @@ vector_to_matrix(const std::vector<double> vector)
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                      Get the control parameters from the ROS2 parameter server                 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-RobotLibrary::Control::Parameters
+RobotLibrary::Control::SerialLinkParameters
 load_control_parameters(const std::shared_ptr<rclcpp::Node> &node)
 {
-    RobotLibrary::Control::Parameters parameters;
+    RobotLibrary::Control::SerialLinkParameters parameters;
 
-    // Declare parameters for controller
-    node->declare_parameter("cartesian_damping", std::vector<double>());
-    node->declare_parameter("cartesian_stiffness", std::vector<double>());
-    node->declare_parameter("frequency", parameters.controlFrequency);
-    node->declare_parameter("joint_position_gain", parameters.jointPositionGain);
-    node->declare_parameter("joint_velocity_gain", parameters.jointVelocityGain);
-    node->declare_parameter("manipulability_threshold", parameters.minManipulability);
-    node->declare_parameter("max_joint_acceleration", parameters.maxJointAcceleration);
-    
-    // Declare parameters for QP solver
-    node->declare_parameter("barrier_reduction_rate", parameters.qpsolver.barrierReductionRate);
-    node->declare_parameter("initial_barrier_scalar", parameters.qpsolver.initialBarrierScalar);
-    node->declare_parameter("max_steps", static_cast<int>(parameters.qpsolver.maxSteps));           // Need to cast from unsigned int to int
-    node->declare_parameter("step_size_tolerance", parameters.qpsolver.stepSizeTolerance);
-    
-    // Get control parameters
-    std::vector<double> damping_vec;
-    node->get_parameter("cartesian_damping", damping_vec);
-    parameters.cartesianDamping = vector_to_matrix(damping_vec);
+    parameters.cartesianDamping = vector_to_matrix(
+        node->declare_parameter<std::vector<double>>("cartesian_damping", std::vector<double>{}));
 
-    std::vector<double> stiffness_vec;
-    node->get_parameter("cartesian_stiffness", stiffness_vec);
-    parameters.cartesianStiffness = vector_to_matrix(stiffness_vec);
+    parameters.cartesianStiffness = vector_to_matrix(
+        node->declare_parameter<std::vector<double>>("cartesian_stiffness", std::vector<double>{}));
 
-    node->get_parameter("frequency", parameters.controlFrequency);
-    node->get_parameter("joint_position_gain", parameters.jointPositionGain);
-    node->get_parameter("joint_velocity_gain", parameters.jointVelocityGain);
-    node->get_parameter("manipulability_threshold", parameters.minManipulability);
-    node->get_parameter("max_joint_acceleration", parameters.maxJointAcceleration);
+    parameters.controlFrequency     = node->declare_parameter<double>("frequency", parameters.controlFrequency);
+    parameters.jointPositionGain    = node->declare_parameter<double>("joint_position_gain", parameters.jointPositionGain);
+    parameters.jointVelocityGain    = node->declare_parameter<double>("joint_velocity_gain", parameters.jointVelocityGain);
+    parameters.minManipulability    = node->declare_parameter<double>("manipulability_threshold", parameters.minManipulability);
+    parameters.maxJointAcceleration = node->declare_parameter<double>("max_joint_acceleration", parameters.maxJointAcceleration);
 
-    // Get QP solver parameters
-    node->get_parameter("barrier_reduction_rate", parameters.qpsolver.barrierReductionRate);
-    node->get_parameter("initial_barrier_scalar", parameters.qpsolver.initialBarrierScalar);
-    node->get_parameter("step_size_tolerance", parameters.qpsolver.stepSizeTolerance);
-    node->get_parameter("max_steps", parameters.qpsolver.maxSteps);
-    
+    parameters.qpsolver.barrierReductionRate = node->declare_parameter<double>("barrier_reduction_rate", parameters.qpsolver.barrierReductionRate);
+    parameters.qpsolver.initialBarrierScalar = node->declare_parameter<double>("initial_barrier_scalar", parameters.qpsolver.initialBarrierScalar);
+
+    parameters.qpsolver.maxSteps = static_cast<unsigned int>(
+        node->declare_parameter<int>("max_steps", static_cast<int>(parameters.qpsolver.maxSteps)));
+
+    parameters.qpsolver.stepSizeTolerance = node->declare_parameter<double>("step_size_tolerance", parameters.qpsolver.stepSizeTolerance);
+
     return parameters;
 }
+
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                     Recursively update statistics for certain result messages                  //
