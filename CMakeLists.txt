@@ -42,6 +42,8 @@ include_directories(include
 
 # Trajectory tracking:
 add_executable(trajectory_tracking_server src/nodes/trajectory_tracking_server.cpp
+                                          src/hold_configuration.cpp
+                                          src/hold_pose.cpp
                                           src/model_updater.cpp
                                           src/track_cartesian_trajectory.cpp
                                           src/track_joint_trajectory.cpp

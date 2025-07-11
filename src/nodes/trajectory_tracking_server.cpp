@@ -21,6 +21,8 @@
 #include <RobotLibrary/Control/SerialDynamicControl.h>
 #include <RobotLibrary/Control/SerialKinematicControl.h>                                            // For serial link robots
 #include <serial_link_action_server/model_updater.hpp>                                              // Joint state subscriber
+#include <serial_link_action_server/hold_configuration.hpp>
+#include <serial_link_action_server/hold_pose.hpp>
 #include <serial_link_action_server/track_cartesian_trajectory.hpp>
 #include <serial_link_action_server/track_joint_trajectory.hpp>
 #include <serial_link_action_server/utilities.hpp>
@@ -76,6 +78,20 @@ int main(int argc, char **argv)
         // Declare action servers
         auto mutex = std::make_shared<std::mutex>();                                                // This stops 2 actions using the robot at the same time
 
+        HoldConfiguration holdConfigurationServer(
+            serverNode,
+            controller,
+            mutex,
+            "hold_configuration",
+            controlTopic);
+        
+        HoldPose holdPoseServer(
+            serverNode,
+            controller,
+            mutex,
+            "hold_pose",
+            controlTopic);        
+            
         TrackJointTrajectory jointTrajectoryServer(
             serverNode,
             controller,
