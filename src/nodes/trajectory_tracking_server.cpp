@@ -2,7 +2,7 @@
  * @file    trajectory_tracking_server.cpp
  * @author  Jon Woolfrey
  * @email   jonathan.woolfrey@gmail.com
- * @date    June 2025
+ * @date    July 2025
  * @version 1.1
  * @brief   Demonstrates the use of joint & cartesian trajectory tracking actions.
  * 

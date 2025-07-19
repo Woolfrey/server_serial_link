@@ -2,7 +2,7 @@
  * @file    follow_transform_server.cpp
  * @author  Jon Woolfrey
  * @email   jonathan.woolfrey@gmail.com
- * @date    June 2025
+ * @date    July 2025
  * @version 1.1
  * @brief   Demonstrates real-time Cartesian velocity control of a robot arm by making it follow a
  *          desired transform.
@@ -23,6 +23,7 @@
 #include <RobotLibrary/Control/SerialDynamicControl.h>
 #include <RobotLibrary/Control/SerialKinematicControl.h>                                            // For serial link robots
 #include <serial_link_action_server/follow_transform.hpp>                                           // Real-time velocity control of endpoint
+#include <serial_link_action_server/hold_configuration.hpp>
 #include <serial_link_action_server/model_updater.hpp>                                              // Joint state subscriber
 #include <serial_link_action_server/track_joint_trajectory.hpp>                                     // Joint trajectory tracking
 #include <serial_link_action_server/utilities.hpp>                                                  // Helper functions
@@ -68,7 +69,7 @@ int main(int argc, char **argv)
         else if (controlMode == "TORQUE")   controller = std::make_unique<RobotLibrary::Control::SerialDynamicControl>(model, endpointName, load_control_parameters(serverNode));
         else
         {
-            std::cerr << "[ERROR] [TRAJECTORY TRACKING SERVER] "
+            std::cerr << "[ERROR] [FOLLOW TRANSFORM SERVER] "
                       << "Invalid argument for control mode. Options are VELOCITY or TORQUE, "
                       << "but received " << controlMode << ".\n";
                                
@@ -78,6 +79,13 @@ int main(int argc, char **argv)
         // Declare action servers
         auto mutex = std::make_shared<std::mutex>();                                                // This stops 2 actions using the robot at the same time
 
+        HoldConfiguration holdConfigurationServer(
+            serverNode,
+            controller,
+            mutex,
+            "hold_configuration",
+            controlTopic);
+        
         TrackJointTrajectory jointTrajectoryServer(
             serverNode,
             controller,
