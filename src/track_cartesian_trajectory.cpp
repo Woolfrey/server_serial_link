@@ -2,8 +2,8 @@
  * @file    track_cartesian_trajectory.cpp
  * @author  Jon Woolfrey
  * @email   jonathan.woolfrey@gmail.com
- * @date    March 2025
- * @version 1.0
+ * @date    July 2025
+ * @version 1.1
  * @brief   Source files for the TrackCartesianTrajectory class.
  * 
  * @details This class creates & advertises a ROS2 for Cartesian trajectory tracking. Given a set of
@@ -251,55 +251,40 @@ TrackCartesianTrajectory::execute(const std::shared_ptr<GoalHandle> goalHandle)
         // Controller may throw a runtime error, so we need to catch it
         try
         {
-            Eigen::VectorXd jointCommands = _controller->track_endpoint_trajectory(desiredPose, desiredVelocity, desiredAcceleration);
-            
-            publish_joint_command(jointCommands);                                                   // Send immediately to robot
+            publish_joint_command(_controller->track_endpoint_trajectory(desiredPose,
+                                                                         desiredVelocity,
+                                                                         desiredAcceleration));
             
             // Update feedback fields
-            RobotLibrary::Model::Pose actualPose = _controller->endpoint_pose();                    // Get computed pose
-            RL_pose_to_ROS(_feedback->actual.pose, actualPose);                                     // Convert from RobotLibrary object to ROS2 msg
+            _feedback->position_error = _controller->position_error();
             
-            Eigen::Vector<double,6> twist = _controller->endpoint_velocity();                       // Get computed endpoint velocity
-            Eigen_twist_to_ROS(_feedback->actual.twist, twist);                                     // Convert from Eigen object to ROS2 msg
-            
-            RL_pose_to_ROS(_feedback->desired.pose, desiredPose);
-            
-            Eigen_twist_to_ROS(_feedback->desired.twist, desiredVelocity);           
+            _feedback->orientation_error = _controller->orientation_error();
 
-            // Set the desired accelerations from the trajectory
-            _feedback->desired.accel.linear.x  = desiredAcceleration[0];
-            _feedback->desired.accel.linear.y  = desiredAcceleration[1];
-            _feedback->desired.accel.linear.z  = desiredAcceleration[2];
-            _feedback->desired.accel.angular.x = desiredAcceleration[3];
-            _feedback->desired.accel.angular.y = desiredAcceleration[4];
-            _feedback->desired.accel.angular.z = desiredAcceleration[5];
-            
-            _feedback->manipulability = _controller->manipulability();
-            
-            _feedback->header.stamp = _node->now();
+            _feedback->manipulability = _controller->manipulability();                              // Proximity to a singularity
+               
+            _feedback->header.stamp = _node->now();                                                 // Time of publication
                   
-            goalHandle->publish_feedback(_feedback);
+            goalHandle->publish_feedback(_feedback);                                                // Make feedback available
             
             // Update error statistics for the result message
-            Eigen::Vector<double,6> error = actualPose.error(desiredPose); 
-            double positionError = error.head(3).norm();
-            double orientationError = error.tail(3).norm();
-            update_statistics(_positionError, positionError, n);         
-            update_statistics(_orientationError, orientationError, n);
+            update_statistics(_positionError, _feedback->position_error, n);
+
+            update_statistics(_orientationError, _feedback->orientation_error, n);
+            
             ++n;                                                                                    // Increment sample size
             
             // Check tolerances
-            if (positionError > goal->position_tolerance)
+            if (_feedback->position_error > goal->position_tolerance)
             {
                 cleanup_and_send_result(3, "Position error tolerance violated: "
-                                        + std::to_string(positionError) + " >= " + std::to_string(goal->position_tolerance) + ".",
+                                        + std::to_string(_feedback->position_error) + " >= " + std::to_string(goal->position_tolerance) + ".",
                                         goalHandle);
                 return;
             }
-            else if (orientationError > goal->orientation_tolerance)
+            else if (_feedback->orientation_error > goal->orientation_tolerance)
             {
                 cleanup_and_send_result(3, "Orientation error tolerance violated: "
-                                        + std::to_string(orientationError) + " >= " + std::to_string(goal->orientation_tolerance) + ".",
+                                        + std::to_string(_feedback->orientation_error) + " >= " + std::to_string(goal->orientation_tolerance) + ".",
                                         goalHandle);
                 return;
             }
@@ -326,7 +311,7 @@ TrackCartesianTrajectory::cleanup_and_send_result(const int &status,
                                                   const std::shared_ptr<GoalHandle> goalHandle)
 {
     publish_joint_command(Eigen::VectorXd::Zero(_numJoints));                                       // Ensure the last command is zero
-            
+
     // Assign data to the result section of the actions
     auto result = std::make_shared<Action::Result>();                                               // Result portion of the message
     result->position_error = _positionError;

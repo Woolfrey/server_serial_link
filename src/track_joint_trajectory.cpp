@@ -2,8 +2,8 @@
  * @file    track_joint_trajectory.cpp
  * @author  Jon Woolfrey
  * @email   jonathan.woolfrey@gmail.com
- * @date    March 2025
- * @version 1.0
+ * @date    July 2025
+ * @version 1.1
  * @brief   Source files for the TrackJointTrajectory class
  * 
  * @details This class is used to advertise a ROS2 action server for joint trajectory tracking.
@@ -36,17 +36,17 @@ TrackJointTrajectory::TrackJointTrajectory(std::shared_ptr<rclcpp::Node> node,
                    actionName,
                    controlTopicName)
 {
-    // Set the size of arrays based on number of joints in robot model
-    
-    _feedback->actual.position.resize(_numJoints);
-    _feedback->actual.velocity.resize(_numJoints);
-//  _feedback->actual.acceleration.resize(_numJoints);                                              // Not defined for "actual"
-    
-    _feedback->desired.position.resize(_numJoints);
-    _feedback->desired.velocity.resize(_numJoints);
-    _feedback->desired.acceleration.resize(_numJoints);
-    
+    // Resize arrays based on number of joints
     _errorStatistics.resize(_numJoints);                                                            // Data on position tracking error
+    
+    _feedback->position_error.resize(_numJoints);
+    
+    _feedback->joint_names.resize(_numJoints);
+    
+    for (unsigned int i = 0; i < _numJoints; ++i)
+    {
+        _feedback->joint_names[i] = _controller->model()->joint(i).name();
+    }
 }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -164,22 +164,17 @@ TrackJointTrajectory::execute(const std::shared_ptr<GoalHandle> goalHandle)
         // NOTE: Controller may throw a runtime error, so need to catch it here.
         try
         {
-            Eigen::VectorXd jointCommand = _controller->track_joint_trajectory(desiredPosition, desiredVelocity, desiredAcceleration);
-            
-            publish_joint_command(jointCommand);                                                    // Send immediately to the robot                                                  
+            // Solve control and send immediately to robot
+            publish_joint_command(_controller->track_joint_trajectory(desiredPosition,
+                                                                      desiredVelocity,
+                                                                      desiredAcceleration));
             
             // Update feedback & result
             for (unsigned int j = 0; j < _numJoints; ++j)
             {
-                // Put Eigen data in to ROS msg data
-                _feedback->desired.position[j]     = desiredPosition[j];
-                _feedback->desired.velocity[j]     = desiredVelocity[j];
-                _feedback->desired.acceleration[j] = desiredAcceleration[j];
-
-                _feedback->actual.position[j] = _controller->model()->joint_positions()[j];
-                _feedback->actual.velocity[j] = _controller->model()->joint_velocities()[j];
+                double positionError = desiredPosition[j] - _controller->model()->joint_positions()[j];
                 
-                double positionError = _feedback->desired.position[j] - _feedback->actual.position[j];
+                _feedback->position_error[j] = positionError;                                       // Add to feedback field
 
                 // Update statistics
                 auto &stats = _errorStatistics[j];
@@ -228,15 +223,13 @@ TrackJointTrajectory::cleanup_and_send_result(const int &status,
     publish_joint_command(Eigen::VectorXd::Zero(_numJoints));                                       // Ensure the last command is zero
     
     auto result = std::make_shared<Action::Result>();                                               // The result component of the action definition
-    
     result->position_error = _errorStatistics;                                                      // Assign statistical summary
-    
     result->message = message;                                                                      // Assign message
 
     if (status == 1)                                                                                // Success
     {
         actionManager->succeed(result);
-        RCLCPP_INFO(_node->get_logger(), "Joint trajectory tracking complete. Awaiting new request.");
+        RCLCPP_INFO(_node->get_logger(), "Joint trajectory tracking complete.");
     }
     else if (status == 2)                                                                           // Cancelled
     {
