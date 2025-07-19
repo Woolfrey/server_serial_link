@@ -32,19 +32,17 @@ HoldConfiguration::HoldConfiguration(std::shared_ptr<rclcpp::Node> node,
                    actionName,
                    controlTopicName)
 {
-    // Set the size of arrays based on number of joints in robot model
-    
-    _feedback->actual.position.resize(_numJoints);
-    _feedback->actual.velocity.resize(_numJoints);
-//  _feedback->actual.acceleration.resize(_numJoints);                                              // Not defined for "actual"
-    
-    _feedback->desired.position.resize(_numJoints);
-    _feedback->desired.velocity.resize(_numJoints);
-    _feedback->desired.acceleration.resize(_numJoints);
-    
+    // Resize arrays based on number of joints
     _errorStatistics.resize(_numJoints);                                                            // Data on position tracking error
-
-    _desiredPosition.resize(_numJoints);
+    
+    _feedback->position_error.resize(_numJoints);
+    
+    _feedback->joint_names.resize(_numJoints);
+    
+    for (unsigned int i = 0; i < _numJoints; ++i)
+    {
+        _feedback->joint_names[i] = _controller->model()->joint(i).name();
+    }
 }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -71,6 +69,8 @@ HoldConfiguration::handle_goal(const rclcpp_action::GoalUUID &uuid,
     }
     else if (goal->configuration.size() == _numJoints)
     {
+        _desiredPosition.resize(_numJoints);
+       
         for (unsigned int i = 0; i < _numJoints; ++i)
         {
             _desiredPosition[i] = goal->configuration[i];
@@ -80,7 +80,7 @@ HoldConfiguration::handle_goal(const rclcpp_action::GoalUUID &uuid,
     {
         RCLCPP_WARN(_node->get_logger(), "Incorrect size for goal configuration. "
                                          "Size must be either 0 (for current configuration), "
-                                         "or %zu, but reeceived %zu.",
+                                         "or %u, but reeceived %zu.",
                                          _numJoints, goal->configuration.size());
 
         return rclcpp_action::GoalResponse::REJECT;
@@ -130,27 +130,19 @@ HoldConfiguration::execute(const std::shared_ptr<GoalHandle> goalHandle)
             return;
         }
 
-        _controller->update();                                                                      // Update kinematic properties
-        
         // NOTE: Controller may throw a runtime error, so need to catch it here.
         try
         {
-            Eigen::VectorXd jointCommand = _controller->track_joint_trajectory(_desiredPosition, Eigen::VectorXd::Zero(_numJoints), Eigen::VectorXd::Zero(_numJoints));
-            
-            publish_joint_command(jointCommand);                                                    // Send immediately to the robot                                                  
-            
+            // Solve control and send immediately to robot
+            publish_joint_command(_controller->track_joint_trajectory(_desiredPosition,
+                                                                      Eigen::VectorXd::Zero(_numJoints),
+                                                                      Eigen::VectorXd::Zero(_numJoints)));
             // Update feedback & result
             for (unsigned int j = 0; j < _numJoints; ++j)
             {
-                // Put Eigen data in to ROS msg data
-                _feedback->desired.position[j]     = _desiredPosition[j];
-                _feedback->desired.velocity[j]     = 0.0;
-                _feedback->desired.acceleration[j] = 0.0;
-
-                _feedback->actual.position[j] = _controller->model()->joint_positions()[j];
-                _feedback->actual.velocity[j] = _controller->model()->joint_velocities()[j];
+                double positionError = _desiredPosition[j] - _controller->model()->joint_positions()[j];
                 
-                double positionError = _feedback->desired.position[j] - _feedback->actual.position[j];
+                _feedback->position_error[j] = positionError;                                       // Add to feedback field
 
                 // Update statistics
                 auto &stats = _errorStatistics[j];
@@ -170,6 +162,8 @@ HoldConfiguration::execute(const std::shared_ptr<GoalHandle> goalHandle)
                     return;
                 }
             }
+            
+            _feedback->header.stamp = _node->now();
             
             goalHandle->publish_feedback(_feedback);                                                // Send feedback over network
             
@@ -200,15 +194,13 @@ HoldConfiguration::cleanup_and_send_result(const int &status,
     publish_joint_command(Eigen::VectorXd::Zero(_numJoints));                                       // Ensure the last command is zero
     
     auto result = std::make_shared<Action::Result>();                                               // The result component of the action definition
-    
     result->position_error = _errorStatistics;                                                      // Assign statistical summary
-    
-    result->message = message;                                                                      // Assign message
+    result->message= message;                                                                       // Assign message
 
     if (status == 1)                                                                                // Success
     {
         actionManager->succeed(result);
-        RCLCPP_INFO(_node->get_logger(), "Hold configuration complete. Awaiting new request.");
+        RCLCPP_INFO(_node->get_logger(), "Hold configuration complete.");
     }
     else if (status == 2)                                                                           // Cancelled
     {
@@ -223,7 +215,6 @@ HoldConfiguration::cleanup_and_send_result(const int &status,
 
     _mutex->unlock();                                                                             // Release control in all cases
 }
-
 
 } // namespace
 

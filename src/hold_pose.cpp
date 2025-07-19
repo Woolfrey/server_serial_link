@@ -79,10 +79,6 @@ HoldPose::handle_goal(const rclcpp_action::GoalUUID &uuid,
     _orientationError.min = std::numeric_limits<double>::max();
     _orientationError.max = std::numeric_limits<double>::lowest();
     
-    // Get desired pose
-    
-    _desiredPose = _controller->endpoint_pose();    
-
     // Generate pose marker
     
     _poseMarker.markers.clear();                                                                    // (Re)set
@@ -146,7 +142,7 @@ HoldPose::handle_goal(const rclcpp_action::GoalUUID &uuid,
 void
 HoldPose::execute(const std::shared_ptr<GoalHandle> goalHandle)
 {
-    RCLCPP_INFO(_node->get_logger(), "Holding desired endpoint pose.");                             // Inform user
+    RCLCPP_INFO(_node->get_logger(), "Holding endpoint pose.");                                     // Inform user
     
     auto goal = goalHandle->get_goal();                                                             // Save it so we can reference it later
     
@@ -154,8 +150,7 @@ HoldPose::execute(const std::shared_ptr<GoalHandle> goalHandle)
     
     unsigned long long int n = 1;                                                                   // Used for statistics    
     
-    
-    _desiredPose = _controller->endpoint_pose(); // FIX THIS LATER
+    RobotLibrary::Model::Pose desiredPose = _controller->endpoint_pose();
     
     while(rclcpp::ok())
     {
@@ -167,52 +162,46 @@ HoldPose::execute(const std::shared_ptr<GoalHandle> goalHandle)
             return;
         }
         
-        _controller->update();                                                                      // COmpute new Jacobian
+        _controller->update();                                                                      // Compute new Jacobian
                
         // Controller may throw a runtime error, so we need to catch it
         try
         {
-            Eigen::VectorXd jointCommands = _controller->track_endpoint_trajectory(_desiredPose,
-                                                                                   Eigen::Vector<double,6>::Zero(),
-                                                                                   Eigen::Vector<double,6>::Zero());
-            
-            publish_joint_command(jointCommands);                                                   // Send immediately to robot
+            // Solve and send immediately to robot:
+            publish_joint_command(_controller->track_endpoint_trajectory(desiredPose,
+                                                                         Eigen::VectorXd::Zero(6),
+                                                                         Eigen::VectorXd::Zero(6)));
             
             // Update feedback fields
-            RobotLibrary::Model::Pose actualPose = _controller->endpoint_pose();                    // Get computed pose
-            RL_pose_to_ROS(_feedback->actual.pose, actualPose);                                     // Convert from RobotLibrary object to ROS2 msg
+            _feedback->position_error = _controller->position_error();
             
-            Eigen::Vector<double,6> twist = _controller->endpoint_velocity();                       // Get computed endpoint velocity
-            Eigen_twist_to_ROS(_feedback->actual.twist, twist);                                     // Convert from Eigen object to ROS2 msg
-            
-            RL_pose_to_ROS(_feedback->desired.pose, _desiredPose);                                  // Transfer desired pose to feedback message
+            _feedback->orientation_error = _controller->orientation_error();
 
-            _feedback->manipulability = _controller->manipulability();                              // Proximity to singularity
-            
-            _feedback->header.stamp = _node->now();                                                 // Add a time stamp
+            _feedback->manipulability = _controller->manipulability();                              // Proximity to a singularity
+               
+            _feedback->header.stamp = _node->now();                                                 // Time of publication
                   
-            goalHandle->publish_feedback(_feedback);                                                // Publish the feedback
+            goalHandle->publish_feedback(_feedback);                                                // Make feedback available
             
             // Update error statistics for the result message
-            Eigen::Vector<double,6> error = actualPose.error(_desiredPose); 
-            double positionError = error.head(3).norm();
-            double orientationError = error.tail(3).norm();
-            update_statistics(_positionError, positionError, n);         
-            update_statistics(_orientationError, orientationError, n);
+            update_statistics(_positionError, _feedback->position_error, n);
+
+            update_statistics(_orientationError, _feedback->orientation_error, n);
+            
             ++n;                                                                                    // Increment sample size
             
             // Check tolerances
-            if (positionError > goal->position_tolerance)
+            if (_feedback->position_error > goal->position_tolerance)
             {
                 cleanup_and_send_result(3, "Position error tolerance violated: "
-                                        + std::to_string(positionError) + " >= " + std::to_string(goal->position_tolerance) + ".",
+                                        + std::to_string(_feedback->position_error) + " >= " + std::to_string(goal->position_tolerance) + ".",
                                         goalHandle);
                 return;
             }
-            else if (orientationError > goal->orientation_tolerance)
+            else if (_feedback->orientation_error > goal->orientation_tolerance)
             {
                 cleanup_and_send_result(3, "Orientation error tolerance violated: "
-                                        + std::to_string(orientationError) + " >= " + std::to_string(goal->orientation_tolerance) + ".",
+                                        + std::to_string(_feedback->orientation_error) + " >= " + std::to_string(goal->orientation_tolerance) + ".",
                                         goalHandle);
                 return;
             }
@@ -227,7 +216,8 @@ HoldPose::execute(const std::shared_ptr<GoalHandle> goalHandle)
         }
     }
 
-    cleanup_and_send_result(1, "This part of the code should never be called. How did that happen??.", goalHandle);
+    cleanup_and_send_result(1, "This part of the code in the HoldPose server class should never be called. "
+                               "How did that happen??.", goalHandle);
 }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
