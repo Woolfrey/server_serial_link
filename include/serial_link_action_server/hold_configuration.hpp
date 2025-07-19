@@ -5,7 +5,6 @@
  * @date    July 2025
  * @version 1.0
  * @brief   A ROS2 action that enables a robot to hold a given joint configuration indefinitely.
- *
  * 
  * @copyright Copyright (c) 2025 Jon Woolfrey
  * 
@@ -20,7 +19,6 @@
 
 #include <serial_link_action_server/action_server_base.hpp>
 #include <serial_link_interfaces/action/hold_configuration.hpp>
-#include <serial_link_interfaces/msg/joint_state.hpp>
 #include <serial_link_interfaces/msg/statistics.hpp>
  
 namespace serial_link_action_server {
