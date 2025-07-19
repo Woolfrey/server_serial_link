@@ -39,8 +39,8 @@ TrackCartesianTrajectory::TrackCartesianTrajectory(std::shared_ptr<rclcpp::Node>
     _feedback->header.frame_id = _controller->model()->base_name();                                 // Save this
     
     // Create publishers for RViz
-    _pathPublisher    = node->create_publisher<visualization_msgs::msg::Marker>("cartesian_path", 1);
-    _wayposePublisher = node->create_publisher<visualization_msgs::msg::MarkerArray>("waypose_markers", 1);
+    _pathPublisher    = node->create_publisher<visualization_msgs::msg::Marker>("cartesian__trajectory_path", 1);
+    _wayposePublisher = node->create_publisher<visualization_msgs::msg::MarkerArray>("cartesian_trajectory_waypoints", 1);
     
     // Set static properties for arrows in RViz
     _arrowMarker.action          = visualization_msgs::msg::Marker::ADD;
@@ -164,8 +164,10 @@ TrackCartesianTrajectory::handle_goal(const rclcpp_action::GoalUUID &uuid,
         }
     }
     
-    _wayposePublisher->publish(_wayposeMarkers);                                                    // Visualise markers
+    _finalPose = poses.back();                                                                      // Save the final pose so we can pass it on
     
+    _wayposePublisher->publish(_wayposeMarkers);                                                    // Visualise markers
+
     // Try to create the trajectory
     try
     {
@@ -177,6 +179,7 @@ TrackCartesianTrajectory::handle_goal(const rclcpp_action::GoalUUID &uuid,
         
         return rclcpp_action::GoalResponse::REJECT;
     }
+    
     
     // Sample trajectory and display path
     _pathMarker.action = visualization_msgs::msg::Marker::ADD;
@@ -314,10 +317,18 @@ TrackCartesianTrajectory::cleanup_and_send_result(const int &status,
 
     // Assign data to the result section of the actions
     auto result = std::make_shared<Action::Result>();                                               // Result portion of the message
-    result->position_error = _positionError;
+    result->position_error    = _positionError;
     result->orientation_error = _orientationError;
-    result->message = message;
+    result->message           = message;
  
+    result->final_pose.position.x    = _finalPose.translation()[0];
+    result->final_pose.position.y    = _finalPose.translation()[1];
+    result->final_pose.position.z    = _finalPose.translation()[2];
+    result->final_pose.orientation.w = _finalPose.quaternion().w();
+    result->final_pose.orientation.x = _finalPose.quaternion().x();
+    result->final_pose.orientation.y = _finalPose.quaternion().y();
+    result->final_pose.orientation.z = _finalPose.quaternion().z();
+     
     // Delete any poses that are remaining
     for (auto &marker : _wayposeMarkers.markers)
     {
