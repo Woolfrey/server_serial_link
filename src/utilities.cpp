@@ -2,8 +2,8 @@
  * @file    utilities.cpp
  * @author  Jon Woolfrey
  * @email   jonathan.woolfrey@gmail.com
- * @date    February 2025
- * @version 1.0
+ * @date    July 2025
+ * @version 1.1
  * @brief   Useful functions for use in action servers.
  * 
  * @details This source file elaborates on the functions in include/Utilities.h
@@ -53,10 +53,10 @@ load_control_parameters(const std::shared_ptr<rclcpp::Node> &node)
 {
     RobotLibrary::Control::SerialLinkParameters parameters;
 
-    parameters.cartesianDamping = vector_to_matrix(
+    parameters.cartesianVelocityGain = vector_to_matrix(
         node->declare_parameter<std::vector<double>>("cartesian_damping", std::vector<double>{}));
 
-    parameters.cartesianStiffness = vector_to_matrix(
+    parameters.cartesianPoseGain = vector_to_matrix(
         node->declare_parameter<std::vector<double>>("cartesian_stiffness", std::vector<double>{}));
 
     parameters.controlFrequency     = node->declare_parameter<double>("frequency", parameters.controlFrequency);
