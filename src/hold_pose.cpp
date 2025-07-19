@@ -58,14 +58,33 @@ HoldPose::handle_goal(const rclcpp_action::GoalUUID &uuid,
     (void)uuid;                                                                                     // Prevents colcon from throwing a warning
        
     // Ensure arguments are sound
-    if(goal->position_tolerance    <= 0.0
-    or goal->orientation_tolerance <= 0.0)
+    if (goal->position_tolerance    <= 0.0
+    or  goal->orientation_tolerance <= 0.0)
     {
         RCLCPP_WARN(_node->get_logger(),
                     "Tolerances were not positive. Position tolerance was %f. Orientation tolerance was %f.",
                     goal->position_tolerance, goal->orientation_tolerance);
 
         return rclcpp_action::GoalResponse::REJECT;
+    }
+    
+    if (goal->use_current_pose)
+    {
+        _desiredPose = _controller->endpoint_pose();
+    }
+    else
+    {
+        Eigen::Vector3d translation;
+        translation << goal->pose.position.x,
+                       goal->pose.position.y,
+                       goal->pose.position.z;
+       
+        Eigen::Quaterniond quaternion(goal->pose.orientation.w,
+                                      goal->pose.orientation.x,
+                                      goal->pose.orientation.y,
+                                      goal->pose.orientation.z);
+      
+        _desiredPose = RobotLibrary::Model::Pose(translation, quaternion);
     }
     
     // (Re)set statistics
@@ -79,11 +98,11 @@ HoldPose::handle_goal(const rclcpp_action::GoalUUID &uuid,
     _orientationError.min = std::numeric_limits<double>::max();
     _orientationError.max = std::numeric_limits<double>::lowest();
     
+    /* Not working?
     // Generate pose marker
     
     _poseMarker.markers.clear();                                                                    // (Re)set
     
-
     size_t base_id = 3;                                                                             // Ensures unique IDs for each pose (3 arrows per pose)
 
     for (int axis = 0; axis < 3; ++axis)
@@ -122,6 +141,7 @@ HoldPose::handle_goal(const rclcpp_action::GoalUUID &uuid,
     }
 
     _posePublisher->publish(_poseMarker);                                                          // Visualise markers
+    */
     
     // Make sure no other action is using the robot
     if(not _mutex->try_lock())
@@ -150,8 +170,6 @@ HoldPose::execute(const std::shared_ptr<GoalHandle> goalHandle)
     
     unsigned long long int n = 1;                                                                   // Used for statistics    
     
-    RobotLibrary::Model::Pose desiredPose = _controller->endpoint_pose();
-    
     while(rclcpp::ok())
     {
         // Check to see if the action has been cancelled
@@ -168,7 +186,7 @@ HoldPose::execute(const std::shared_ptr<GoalHandle> goalHandle)
         try
         {
             // Solve and send immediately to robot:
-            publish_joint_command(_controller->track_endpoint_trajectory(desiredPose,
+            publish_joint_command(_controller->track_endpoint_trajectory(_desiredPose,
                                                                          Eigen::VectorXd::Zero(6),
                                                                          Eigen::VectorXd::Zero(6)));
             
