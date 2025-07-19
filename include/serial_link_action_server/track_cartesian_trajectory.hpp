@@ -67,6 +67,8 @@ class TrackCartesianTrajectory : public ActionServerBase<serial_link_interfaces:
        
         RobotLibrary::Trajectory::CartesianSpline _trajectory;                                      ///< Trajectory generator
 
+        RobotLibrary::Model::Pose _finalPose;                                                       ///< Used to pass on to the result field
+        
         visualization_msgs::msg::Marker _arrowMarker;                                               ///< Default properties for arrows
         
         visualization_msgs::msg::Marker _pathMarker;                                                ///< For plotting the Cartesian path
