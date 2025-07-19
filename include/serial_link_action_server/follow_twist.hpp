@@ -2,8 +2,8 @@
  * @file    follow_twist.hpp
  * @author  Jon Woolfrey
  * @email   jonathan.woolfrey@gmail.com
- * @date    March 2025
- * @version 1.0
+ * @date    July 2025
+ * @version 1.1
  * @brief   A ROS2 action that enables a robot arm to follow a twist command.
  * 
  * @details This class subscribes to a geometry_msgs::msg::Twist which is then executed by the robot
@@ -20,6 +20,7 @@
 #ifndef FOLLOW_TWIST_H
 #define FOLLOW_TWIST_H
 
+#include <geometry_msgs/msg/twist_stamped.hpp>
 #include <serial_link_action_server/action_server_base.hpp>                                         // Base class
 #include <serial_link_action_server/utilities.hpp>                                                  // Helper functions
 #include <serial_link_interfaces/action/follow_twist.hpp>                                           // Custom generated action
@@ -115,6 +116,6 @@ class FollowTwist : public serial_link_action_server::ActionServerBase<serial_li
                                 const std::shared_ptr<GoalHandle> goalHandle);
 };                                                                                                  // Semicolon required after a class declaration
 
-}
+} // namespace
 
 #endif
