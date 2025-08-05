@@ -84,7 +84,7 @@ HoldPose::handle_goal(const rclcpp_action::GoalUUID &uuid,
                                       goal->pose.orientation.y,
                                       goal->pose.orientation.z);
       
-        _desiredPose = RobotLibrary::Model::Pose(translation, quaternion);
+        _desiredPose = RobotLibrary::Model::Pose(translation, quaternion.normalized());
     }
     
     // (Re)set statistics
