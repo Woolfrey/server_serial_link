@@ -54,10 +54,10 @@ load_control_parameters(const std::shared_ptr<rclcpp::Node> &node)
     RobotLibrary::Control::SerialLinkParameters parameters;
 
     parameters.cartesianVelocityGain = vector_to_matrix(
-        node->declare_parameter<std::vector<double>>("cartesian_damping", std::vector<double>{}));
+        node->declare_parameter<std::vector<double>>("cartesian_velocity_gain", std::vector<double>{}));
 
     parameters.cartesianPoseGain = vector_to_matrix(
-        node->declare_parameter<std::vector<double>>("cartesian_stiffness", std::vector<double>{}));
+        node->declare_parameter<std::vector<double>>("cartesian_pose_gain", std::vector<double>{}));
 
     parameters.controlFrequency     = node->declare_parameter<double>("frequency", parameters.controlFrequency);
     parameters.jointPositionGain    = node->declare_parameter<double>("joint_position_gain", parameters.jointPositionGain);
