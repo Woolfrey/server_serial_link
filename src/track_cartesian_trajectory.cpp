@@ -106,18 +106,18 @@ TrackCartesianTrajectory::handle_goal(const rclcpp_action::GoalUUID &uuid,
     {
         times.push_back(point.time);                                                                // Add the time to the array
 
-        Eigen::Vector3d translation = {point.pose.position.x,
-                                       point.pose.position.y,
-                                       point.pose.position.z};
+        Eigen::Vector3d translation(point.pose.position.x,
+                                    point.pose.position.y,
+                                    point.pose.position.z);
                                        
-        Eigen::Quaterniond quaternion = {point.pose.orientation.w,
-                                         point.pose.orientation.x,
-                                         point.pose.orientation.y,
-                                         point.pose.orientation.z};
+        Eigen::Quaterniond quaternion(point.pose.orientation.w,
+                                      point.pose.orientation.x,
+                                      point.pose.orientation.y,
+                                      point.pose.orientation.z);                           
        
        // Check the frame of reference
             if(point.reference_frame == 0) poses.emplace_back(RobotLibrary::Model::Pose(translation,quaternion)); // In base frame
-       else if(point.reference_frame == 1) poses.emplace_back(poses.back()*RobotLibrary::Model::Pose(translation,quaternion)); // In current endpoint frame; transform to base
+       else if(point.reference_frame == 1) poses.emplace_back(poses.back() * RobotLibrary::Model::Pose(translation,quaternion)); // In current endpoint frame; transform to base
        else if(point.reference_frame == 2)                                                          // Pose is relative to endpoint frame, but in base frame coordinates
        {
             translation = poses.back().translation() + translation;                                 // Add the translation
@@ -163,11 +163,11 @@ TrackCartesianTrajectory::handle_goal(const rclcpp_action::GoalUUID &uuid,
             _wayposeMarkers.markers.push_back(arrow);
         }
     }
+ 
+    _wayposePublisher->publish(_wayposeMarkers);                                                    // Visualise markers   
     
     _finalPose = poses.back();                                                                      // Save the final pose so we can pass it on
     
-    _wayposePublisher->publish(_wayposeMarkers);                                                    // Visualise markers
-
     // Try to create the trajectory
     try
     {
@@ -179,7 +179,6 @@ TrackCartesianTrajectory::handle_goal(const rclcpp_action::GoalUUID &uuid,
         
         return rclcpp_action::GoalResponse::REJECT;
     }
-    
     
     // Sample trajectory and display path
     _pathMarker.action = visualization_msgs::msg::Marker::ADD;
