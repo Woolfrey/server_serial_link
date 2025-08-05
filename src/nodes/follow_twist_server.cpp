@@ -100,7 +100,7 @@ int main(int argc, char **argv)
             controlTopic);
                  
         // Add nodes to executor and spin
-        rclcpp::executors::MultiThreadedExecutor executor;
+        rclcpp::executors::SingleThreadedExecutor executor;
         executor.add_node(modelUpdaterNode);
         executor.add_node(serverNode);
         
