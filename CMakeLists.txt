@@ -42,6 +42,8 @@ include_directories(include
 
 # Trajectory tracking:
 add_executable(trajectory_tracking_server src/nodes/trajectory_tracking_server.cpp
+                                          src/hold_configuration.cpp
+                                          src/hold_pose.cpp
                                           src/model_updater.cpp
                                           src/track_cartesian_trajectory.cpp
                                           src/track_joint_trajectory.cpp
@@ -64,6 +66,7 @@ ament_target_dependencies(trajectory_tracking_server "ament_cmake"
 # Follow twist:
 add_executable(follow_twist_server src/nodes/follow_twist_server.cpp
                                    src/follow_twist.cpp
+                                   src/hold_configuration.cpp
                                    src/model_updater.cpp
                                    src/track_joint_trajectory.cpp
                                    src/utilities.cpp)
@@ -85,6 +88,7 @@ ament_target_dependencies(follow_twist_server "ament_cmake"
 # Follow transform:
 add_executable(follow_transform_server src/nodes/follow_transform_server.cpp
                                        src/follow_transform.cpp
+                                       src/hold_configuration.cpp
                                        src/model_updater.cpp
                                        src/track_joint_trajectory.cpp
                                        src/utilities.cpp)
@@ -106,7 +110,7 @@ ament_target_dependencies(follow_transform_server "ament_cmake"
 #                                 Install files so ROS2 can find them                              #
 ####################################################################################################
 install(TARGETS follow_transform_server
-                follow_twist_server
+                #follow_twist_server
                 trajectory_tracking_server
         DESTINATION lib/${PROJECT_NAME}
 )

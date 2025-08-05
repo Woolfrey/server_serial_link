@@ -2,8 +2,8 @@
  * @file    follow_transform.cpp
  * @author  Jon Woolfrey
  * @email   jonathan.woolfrey@gmail.com
- * @date    April 2025
- * @version 1.0
+ * @date    July 2025
+ * @version 1.2
  * @brief   Source code for the FollowTransform action server.
  * 
  * @details This class is the implementation of the FollowTransform action server. The action server
@@ -18,7 +18,6 @@
  */
 
 #include <serial_link_action_server/follow_transform.hpp>
-
 
 namespace serial_link_action_server {
 
@@ -106,7 +105,7 @@ FollowTransform::execute(const std::shared_ptr<GoalHandle> goalHandle)
         // Check for
         if (goalHandle->is_canceling())
         {
-            cleanup_and_send_result(2, "Follow twist cancelled.", goalHandle);
+            cleanup_and_send_result(2, "Follow transform action cancelled.", goalHandle);
             return;
         }
  
@@ -140,54 +139,41 @@ FollowTransform::execute(const std::shared_ptr<GoalHandle> goalHandle)
         // Controller could throw an error, so we need to catch it
         try
         {
-            Eigen::VectorXd jointCommands = _controller->track_endpoint_trajectory
-            (   
-                desiredPose,
-                Eigen::Vector<double,6>::Zero(),
-                Eigen::Vector<double,6>::Zero()
-            );
-            
-            publish_joint_command(jointCommands);                                                   // Send to robot immediately
+            // Solve control and send immediately to robot
+            publish_joint_command(_controller->track_endpoint_trajectory(desiredPose,
+                                                                         Eigen::Vector<double,6>::Zero(),
+                                                                         Eigen::Vector<double,6>::Zero()));                                                   // Send to robot immediately
             
             // Update feedback fields
-            RobotLibrary::Model::Pose actualPose = _controller->endpoint_pose();                    // Get computed pose
+            _feedback->position_error = _controller->position_error();
             
-            RL_pose_to_ROS(_feedback->actual.pose, actualPose);                                     // Convert from RobotLibrary object to ROS2 msg
-            
-            Eigen::Vector<double,6> twist = _controller->endpoint_velocity();                       // Get computed endpoint velocity
-            
-            Eigen_twist_to_ROS(_feedback->actual.twist, twist);                                     // Convert from Eigen object to ROS2 msg
-            
-            RL_pose_to_ROS(_feedback->desired.pose, desiredPose);                                   // Convert to ROS feedback msg from RobotLibrary pose
-            
-            Eigen_twist_to_ROS(_feedback->desired.twist, Eigen::VectorXd::Zero(6));                 // Convert to ROS2 feedback msg from Eigen::Vector            
-            
+            _feedback->orientation_error = _controller->orientation_error();
+
             _feedback->manipulability = _controller->manipulability();                              // Proximity to a singularity
-            
+               
             _feedback->header.stamp = _node->now();                                                 // Time of publication
                   
             goalHandle->publish_feedback(_feedback);                                                // Make feedback available
             
             // Update error statistics for the result message
-            Eigen::Vector<double,6> error = actualPose.error(desiredPose); 
-            double positionError = error.head(3).norm();
-            double orientationError = error.tail(3).norm();
-            update_statistics(_positionError, positionError, n);         
-            update_statistics(_orientationError, orientationError, n);
+            update_statistics(_positionError, _feedback->position_error, n);
+
+            update_statistics(_orientationError, _feedback->orientation_error, n);
+            
             ++n;                                                                                    // Increment sample size
             
             // Check tolerances
-            if (positionError > goal->position_tolerance)
+            if (_feedback->position_error > goal->position_tolerance)
             {
                 cleanup_and_send_result(3, "Position error tolerance violated: "
-                                        + std::to_string(positionError) + " >= " + std::to_string(goal->position_tolerance) + ".",
+                                        + std::to_string(_feedback->position_error) + " >= " + std::to_string(goal->position_tolerance) + ".",
                                         goalHandle);
                 return;
             }
-            else if (orientationError > goal->orientation_tolerance)
+            else if (_feedback->orientation_error > goal->orientation_tolerance)
             {
                 cleanup_and_send_result(3, "Orientation error tolerance violated: "
-                                        + std::to_string(orientationError) + " >= " + std::to_string(goal->orientation_tolerance) + ".",
+                                        + std::to_string(_feedback->orientation_error) + " >= " + std::to_string(goal->orientation_tolerance) + ".",
                                         goalHandle);
                 return;
             }
@@ -227,19 +213,19 @@ FollowTransform::cleanup_and_send_result(const int &status,
         case 1:                                                                                     // Successfully completed
         {
             goalHandle->succeed(result);
-            RCLCPP_INFO(_node->get_logger(), "Follow transform finished. Awaiting new request.");
+            RCLCPP_INFO(_node->get_logger(), "Follow transform action finished.");
             break;
         }
         case 2:                                                                                     // Cancelled
         {
             goalHandle->canceled(result);
-            RCLCPP_INFO(_node->get_logger(), "Follow transform cancelled. Awaiting new request.");
+            RCLCPP_INFO(_node->get_logger(), "Follow transform action cancelled.");
             break;
         }
         case 3:                                                                                     // Aborted
         {
             goalHandle->abort(result);
-            RCLCPP_ERROR(_node->get_logger(), "Follow transform aborted.");
+            RCLCPP_ERROR(_node->get_logger(), "Follow transform action aborted.");
             break;
         }
     }

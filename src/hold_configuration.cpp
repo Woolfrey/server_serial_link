@@ -1,35 +1,31 @@
 /**
- * @file    track_joint_trajectory.cpp
+ * @file    hold_configuration.cpp
  * @author  Jon Woolfrey
  * @email   jonathan.woolfrey@gmail.com
  * @date    July 2025
- * @version 1.1
- * @brief   Source files for the TrackJointTrajectory class
- * 
- * @details This class is used to advertise a ROS2 action server for joint trajectory tracking.
- *          Given a series of joint configurations, and times at which to reach them, it will generate
- *          a spline trajectory to connect them. Real-time feedback control is performed to track it.
- * 
+ * @version 1.0
+ * @brief   A ROS2 action that enables a robot to hold a given joint configuration indefinitely.
+ *
  * @copyright Copyright (c) 2025 Jon Woolfrey
  * 
  * @license GNU General Public License V3
  * 
- * @see https://github.com/Woolfrey/software_robot_library for more information on the SerialLink control class.
+ * @see https://github.com/Woolfrey/software_robot_library for more information on the control class.
  * @see https://docs.ros.org/en/humble/index.html for ROS 2 documentation.
  */
-
-#include <serial_link_action_server/track_joint_trajectory.hpp>
-
+ 
+#include <serial_link_action_server/hold_configuration.hpp>
+ 
 namespace serial_link_action_server {
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
- //                                            Constructor                                         //
+ //                                         Constructor                                            //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-TrackJointTrajectory::TrackJointTrajectory(std::shared_ptr<rclcpp::Node> node,
-                                           std::shared_ptr<RobotLibrary::Control::SerialLinkBase> controller,
-                                           std::shared_ptr<std::mutex> mutex,
-                                           const std::string &actionName,
-                                           const std::string &controlTopicName)
+HoldConfiguration::HoldConfiguration(std::shared_ptr<rclcpp::Node> node,
+                                     std::shared_ptr<RobotLibrary::Control::SerialLinkBase> controller,
+                                     std::shared_ptr<std::mutex> mutex,
+                                     const std::string &actionName,
+                                     const std::string &controlTopicName)
 : ActionServerBase(node,
                    controller,
                    mutex,
@@ -53,12 +49,12 @@ TrackJointTrajectory::TrackJointTrajectory(std::shared_ptr<rclcpp::Node> node,
  //                    Process a request to perform joint trajectory tracking                      //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 rclcpp_action::GoalResponse
-TrackJointTrajectory::handle_goal(const rclcpp_action::GoalUUID &uuid,
-                                  std::shared_ptr<const Action::Goal> goal)
+HoldConfiguration::handle_goal(const rclcpp_action::GoalUUID &uuid,
+                               std::shared_ptr<const Action::Goal> goal)
 {
     (void)uuid;                                                                                     // Stops colcon from throwing a warning
     
-    // Check tolerances
+    // Check for correct size of tolerances
     if(goal->tolerances.size() < _numJoints)
     {
         RCLCPP_WARN(_node->get_logger(), "Insufficient number of joint tolerances set for this robot.");
@@ -66,42 +62,26 @@ TrackJointTrajectory::handle_goal(const rclcpp_action::GoalUUID &uuid,
         return rclcpp_action::GoalResponse::REJECT;
     }
     
-    // Set up the trajectory
-    std::vector<double> times(1, 0.0);                                                              // Initialize times with the starting point
-    
-    std::vector<Eigen::VectorXd> positions;                                                         // Waypoints for the trajectory
-    
-    positions.reserve(goal->points.size() + 1);                                                     // Reserve space for efficiency
-    
-    positions.emplace_back(_controller->model()->joint_positions());                                // Start trajectory from current position
-
-    // Iterate over trajectory points in the request
-    for (const auto &point : goal->points)
-    {   
-        // Check dimension mismatch
-        if (point.position.size() != _numJoints)
+    // Assign the goal configuration
+    if (goal->configuration.size() == 0)
+    {
+        _desiredPosition = _controller->model()->joint_positions();                                 // No desired configuration given; use current.
+    }
+    else if (goal->configuration.size() == _numJoints)
+    {
+        _desiredPosition.resize(_numJoints);
+       
+        for (unsigned int i = 0; i < _numJoints; ++i)
         {
-            RCLCPP_WARN(_node->get_logger(),
-                        "Request for joint trajectory tracking rejected. "
-                        "Dimensions of trajectory point (%zu) do not match number of joints in model (%u).",
-                        point.position.size(), _numJoints);
-
-            return rclcpp_action::GoalResponse::REJECT;
+            _desiredPosition[i] = goal->configuration[i];
         }
-
-        times.push_back(point.time);                                                                // Add time to the vector
-
-        positions.emplace_back(Eigen::Map<const Eigen::VectorXd>(point.position.data(), point.position.size()));
     }
-    
-    // Create the trajectory (it could throw an error, so we need to catch it)
-    try
+    else
     {
-        _trajectory = RobotLibrary::Trajectory::SplineTrajectory(positions, times, _controller->model()->joint_velocities());
-    }
-    catch (const std::exception &exception)
-    {
-        RCLCPP_ERROR(_node->get_logger(), "Joint trajectory generation failed.\n%s", exception.what());
+        RCLCPP_WARN(_node->get_logger(), "Incorrect size for goal configuration. "
+                                         "Size must be either 0 (for current configuration), "
+                                         "or %u, but reeceived %zu.",
+                                         _numJoints, goal->configuration.size());
 
         return rclcpp_action::GoalResponse::REJECT;
     }
@@ -114,14 +94,13 @@ TrackJointTrajectory::handle_goal(const rclcpp_action::GoalUUID &uuid,
         error.min = std::numeric_limits<double>::max();
         error.max = std::numeric_limits<double>::lowest();
     }
-    
+
     // Ensure robot is not in use
     if(not _mutex->try_lock())
     {
         RCLCPP_WARN(_node->get_logger(), "Request for joint trajectory tracking rejected. "
                                          "Another action is using the robot.");
                     
-                
         return rclcpp_action::GoalResponse::REJECT;
     }
 
@@ -132,47 +111,36 @@ TrackJointTrajectory::handle_goal(const rclcpp_action::GoalUUID &uuid,
  //                                       MAIN CONTROL LOOP                                        //
 ////////////////////////////////////////////////////////////////////////////////////////////////////       
 void   
-TrackJointTrajectory::execute(const std::shared_ptr<GoalHandle> goalHandle)
+HoldConfiguration::execute(const std::shared_ptr<GoalHandle> goalHandle)
 {
-    RCLCPP_INFO(_node->get_logger(), "Executing joint trajectory tracking.");                       // Inform user
+    RCLCPP_INFO(_node->get_logger(), "Holding joint configuration.");                               // Inform user
     
     rclcpp::Rate loopRate(_controller->frequency());                                                // Regulate this loop to the robot control frequency
     
     auto goal = goalHandle->get_goal();                                                             // Save this so we can reference it later
     
     unsigned long long n = 1;                                                                       // Sample size for statistics
-    
-    double startTime = _node->get_clock()->now().seconds();                                         // Save this
-    
+
     while(rclcpp::ok())
     {
         // Check to see if canceling
         if(goalHandle->is_canceling())
         {
-            cleanup_and_send_result(2, "Joint trajectory tracking cancelled.", goalHandle);
+            cleanup_and_send_result(2, "Hold joint configuration cancelled.", goalHandle);
             return;
         }
-        
-        double elapsedTime = _node->get_clock()->now().seconds() - startTime;                       // Do I need to explain this?
-        
-        if(elapsedTime > goal->points.back().time) break;                                           // Reached the end of the trajectory.
-        
-        _controller->update();                                                                      // Update kinematic properties
-        
-        const auto &[desiredPosition, desiredVelocity, desiredAcceleration] = _trajectory.query_state(elapsedTime);
-        
+
         // NOTE: Controller may throw a runtime error, so need to catch it here.
         try
         {
             // Solve control and send immediately to robot
-            publish_joint_command(_controller->track_joint_trajectory(desiredPosition,
-                                                                      desiredVelocity,
-                                                                      desiredAcceleration));
-            
+            publish_joint_command(_controller->track_joint_trajectory(_desiredPosition,
+                                                                      Eigen::VectorXd::Zero(_numJoints),
+                                                                      Eigen::VectorXd::Zero(_numJoints)));
             // Update feedback & result
             for (unsigned int j = 0; j < _numJoints; ++j)
             {
-                double positionError = desiredPosition[j] - _controller->model()->joint_positions()[j];
+                double positionError = _desiredPosition[j] - _controller->model()->joint_positions()[j];
                 
                 _feedback->position_error[j] = positionError;                                       // Add to feedback field
 
@@ -195,6 +163,8 @@ TrackJointTrajectory::execute(const std::shared_ptr<GoalHandle> goalHandle)
                 }
             }
             
+            _feedback->header.stamp = _node->now();
+            
             goalHandle->publish_feedback(_feedback);                                                // Send feedback over network
             
             ++n;
@@ -209,40 +179,42 @@ TrackJointTrajectory::execute(const std::shared_ptr<GoalHandle> goalHandle)
         }
     }
 
-    cleanup_and_send_result(1, "Joint trajectory tracking completed.", goalHandle);
+    // Technically, this should never be called:
+    cleanup_and_send_result(1, "Hold joint configuration completed.", goalHandle);
 }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                          Complete the action and send result to server                         //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void
-TrackJointTrajectory::cleanup_and_send_result(const int &status,
-                                              const std::string &message,
-                                              const std::shared_ptr<GoalHandle> actionManager)
+HoldConfiguration::cleanup_and_send_result(const int &status,
+                                           const std::string &message,
+                                           const std::shared_ptr<GoalHandle> actionManager)
 {
     publish_joint_command(Eigen::VectorXd::Zero(_numJoints));                                       // Ensure the last command is zero
     
     auto result = std::make_shared<Action::Result>();                                               // The result component of the action definition
     result->position_error = _errorStatistics;                                                      // Assign statistical summary
-    result->message = message;                                                                      // Assign message
+    result->message= message;                                                                       // Assign message
 
     if (status == 1)                                                                                // Success
     {
         actionManager->succeed(result);
-        RCLCPP_INFO(_node->get_logger(), "Joint trajectory tracking complete.");
+        RCLCPP_INFO(_node->get_logger(), "Hold configuration complete.");
     }
     else if (status == 2)                                                                           // Cancelled
     {
         actionManager->canceled(result);
-        RCLCPP_INFO(_node->get_logger(), "Joint trajectory tracking cancelled.");
+        RCLCPP_INFO(_node->get_logger(), "Hold configuration cancelled.");
     }
     else  // status == 3 (aborted)
     {
         actionManager->abort(result);
-        RCLCPP_INFO(_node->get_logger(), "Joint trajectory tracking aborted.");
+        RCLCPP_INFO(_node->get_logger(), "Hold joint configuration aborted.");
     }
 
     _mutex->unlock();                                                                             // Release control in all cases
 }
 
-}
+} // namespace
+

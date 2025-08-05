@@ -1,14 +1,10 @@
 /**
- * @file    track_cartesian_trajectory.hpp
+ * @file    hold_pose.hpp
  * @author  Jon Woolfrey
  * @email   jonathan.woolfrey@gmail.com
- * @date    February 2025
- * @version 1.0
- * @brief   A ROS2 action that enables the endpoint of a robot arm to follow a trajectory.
- * 
- * @details This class creates & advertises a ROS2 for Cartesian trajectory tracking. Given a set of
- *          poses and times, it generates a spline trajectory. It then performs real-time feedback
- *          control to make the endpoint of the robot arm follow this trajectory.
+ * @date    July 2025
+ * @version 1.0.0
+ * @brief   A ROS2 action that enables a robot to hold a given Cartesian endpoint pose indefinitely.
  * 
  * @copyright Copyright (c) 2025 Jon Woolfrey
  * 
@@ -17,15 +13,15 @@
  * @see https://github.com/Woolfrey/software_robot_library for more information on the control class.
  * @see https://docs.ros.org/en/humble/index.html for ROS 2 documentation.
  */
-#ifndef TRACK_CARTESIAN_TRAJECTORY_H
-#define TRACK_CARTESIAN_TRAJECTORY_H
+ 
+#ifndef HOLD_POSE_H
+#define HOLD_POSE_H
 
 #include <geometry_msgs/msg/pose.hpp>
 #include <geometry_msgs/msg/twist.hpp>
-#include <RobotLibrary/Trajectory/CartesianSpline.h>                                                // Trajectory generator
 #include <serial_link_action_server/action_server_base.hpp>
 #include <serial_link_action_server/utilities.hpp>
-#include <serial_link_interfaces/action/track_cartesian_trajectory.hpp>                             // Custom generated action
+#include <serial_link_interfaces/action/hold_pose.hpp>                                              // Custom generated action
 #include <visualization_msgs/msg/marker_array.hpp>
 
 namespace serial_link_action_server {
@@ -33,11 +29,11 @@ namespace serial_link_action_server {
 /**
  * @brief This class performs joint trajectory tracking for a serial link robot arm.
  */
-class TrackCartesianTrajectory : public ActionServerBase<serial_link_interfaces::action::TrackCartesianTrajectory>
+class HoldPose : public ActionServerBase<serial_link_interfaces::action::HoldPose>
 {
     public:
 
-        using Action  = serial_link_interfaces::action::TrackCartesianTrajectory;                // For brevity       
+        using Action  = serial_link_interfaces::action::HoldPose;                                   // For brevity       
         
         using ActionManager = rclcpp_action::ServerGoalHandle<Action>;                              // For brevity
                 
@@ -49,31 +45,25 @@ class TrackCartesianTrajectory : public ActionServerBase<serial_link_interfaces:
          * @param actionName What this action will be listed as on the ROS2 network
          * @param controlTopicName For the publisher
          */
-        TrackCartesianTrajectory(std::shared_ptr<rclcpp::Node> node,
-                                 std::shared_ptr<RobotLibrary::Control::SerialLinkBase> controller,
-                                 std::shared_ptr<std::mutex> mutex,
-                                 const std::string &actionName = "track_cartesian_trajectory",
-                                 const std::string &controlTopicName = "joint_commands");
+        HoldPose(std::shared_ptr<rclcpp::Node> node,
+                 std::shared_ptr<RobotLibrary::Control::SerialLinkBase> controller,
+                 std::shared_ptr<std::mutex> mutex,
+                 const std::string &actionName = "hold_pose",
+                 const std::string &controlTopicName = "joint_commands");
     
     private:
 
-        rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr _wayposePublisher;       ///< Visualises points on the trajectory
+        rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr _posePublisher;          ///< Visualises the desired pose
         
-        rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr _pathPublisher;               ///< Visualises the path taken by the end-effector
+        RobotLibrary::Model::Pose _desiredPose;                                                     ///< As it says
         
         serial_link_interfaces::msg::Statistics _orientationError;                                  ///< Statistical summary of orientation tracking performance
         
         serial_link_interfaces::msg::Statistics _positionError;                                     ///< Statistical summary of position tracking performance
        
-        RobotLibrary::Trajectory::CartesianSpline _trajectory;                                      ///< Trajectory generator
-
-        RobotLibrary::Model::Pose _finalPose;                                                       ///< Used to pass on to the result field
-        
         visualization_msgs::msg::Marker _arrowMarker;                                               ///< Default properties for arrows
         
-        visualization_msgs::msg::Marker _pathMarker;                                                ///< For plotting the Cartesian path
-        
-        visualization_msgs::msg::MarkerArray _wayposeMarkers;                                       ///< Stores wayposes
+        visualization_msgs::msg::MarkerArray _poseMarker;                                           ///< Stores desired pose
         
         /**
          * @brief Processes the request to execute action.

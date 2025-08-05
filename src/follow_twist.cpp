@@ -2,8 +2,8 @@
  * @file    follow_twist.cpp
  * @author  Jon Woolfrey
  * @email   jonathan.woolfrey@gmail.com
- * @date    February 2025
- * @version 1.0
+ * @date    July 2025
+ * @version 1.1
  * @brief   Source code for the FollowTwist action server.
  * 
  * @details This action enables a serial link robot arm to follow a Cartesian velocity command (twist)
@@ -197,16 +197,17 @@ FollowTwist::execute(const std::shared_ptr<GoalHandle> goalHandle)
         // Controller could throw an error, so we need to catch it
         try
         {
-            Eigen::VectorXd jointCommands = _controller->resolve_endpoint_twist(desiredTwist);      // Solve control
+            publish_joint_command(_controller->resolve_endpoint_twist(desiredTwist));               // Solve the control and send straight to robot                                                  // Send to robot immediately
             
-            publish_joint_command(jointCommands);                                                   // Send to robot immediately
+            // Update & publish feedback
             
-            Eigen::Vector<double,6> actualTwist = _controller->endpoint_velocity();                 // Get the actual endpoint velocity
+            Eigen::Vector<double,6> actualTwist = _controller->endpoint_velocity();
             
-            // Update & publish feedback fields 
-            Eigen_twist_to_ROS(_feedback->actual.twist, actualTwist);
- 
-            Eigen_twist_to_ROS(_feedback->desired.twist, desiredTwist);
+            Eigen::Vector<double,6> twistError = desiredTwist - actualTwist;
+            
+            _feedback->linear_error = twistError.head(3).norm();
+            
+            _feedback->angular_error = twistError.tail(3).norm();
 
             _feedback->manipulability = _controller->manipulability();
             
@@ -215,15 +216,9 @@ FollowTwist::execute(const std::shared_ptr<GoalHandle> goalHandle)
             goalHandle->publish_feedback(_feedback);
             
             // Update error statistics for result message
-            Eigen::VectorXd twistError = desiredTwist - _controller->endpoint_velocity();
-            
-            double linearError = twistError.head(3).norm();
+            update_statistics(_linearError, _feedback->linear_error, n);
 
-            update_statistics(_linearError, linearError, n);
-            
-            double angularError = twistError.tail(3).norm();
-            
-            update_statistics(_angularError, angularError, n);
+            update_statistics(_angularError, _feedback->angular_error, n);
             
             ++n;                                                                                    // Increment sample size
             
@@ -267,17 +262,17 @@ FollowTwist::execute(const std::shared_ptr<GoalHandle> goalHandle)
             _markerArrayPublisher->publish(_markerArray);
             
             // Check tolerances
-            if (linearError > goal->linear_tolerance)
+            if (_feedback->linear_error > goal->linear_tolerance)
             {
                 cleanup_and_send_result(3, "Linear velocity error tolerance violated: "
-                                        + std::to_string(linearError) + " >= " + std::to_string(goal->linear_tolerance) + ".",
+                                        + std::to_string(_feedback->linear_error) + " >= " + std::to_string(goal->linear_tolerance) + ".",
                                         goalHandle);
                 return;
             }
-            else if (angularError > goal->angular_tolerance)
+            else if (_feedback->angular_error > goal->angular_tolerance)
             {
                 cleanup_and_send_result(3, "Angular velocity error tolerance violated: "
-                                        + std::to_string(angularError) + " >= " + std::to_string(goal->angular_tolerance) + ".",
+                                        + std::to_string(_feedback->angular_error) + " >= " + std::to_string(goal->angular_tolerance) + ".",
                                         goalHandle);
                 return;
             }
@@ -354,4 +349,4 @@ FollowTwist::cleanup_and_send_result(const int &status,
     _mutex->unlock();                                                                               // Release control
 }
 
-}
+} // namespace

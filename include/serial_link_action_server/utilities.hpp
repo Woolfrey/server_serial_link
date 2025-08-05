@@ -19,11 +19,12 @@
 #ifndef UTILITIES_H
 #define UTILITIES_H
  
-#include <Eigen/Core>
+#include <Eigen/Core>                                                       
 #include <geometry_msgs/msg/twist.hpp>
 #include <geometry_msgs/msg/pose.hpp>
 #include <rclcpp/rclcpp.hpp>
-#include <RobotLibrary/Control/SerialLinkBase.h>
+#include <RobotLibrary/Control/DataStructures.h>                                                    // SerialLinkParameters
+#include <RobotLibrary/Model/Pose.h>
 #include <serial_link_interfaces/msg/statistics.hpp>
 
 namespace serial_link_action_server {
@@ -41,7 +42,7 @@ vector_to_matrix(const std::vector<double> vector);
  * @param node A ROS2 node class is required to retrieve parameters.
  * @return A custom struct which is used by the RobotLibrary::Control::SerialLinkBase class(es).
  */
-RobotLibrary::Control::Parameters
+RobotLibrary::Control::SerialLinkParameters
 load_control_parameters(const std::shared_ptr<rclcpp::Node> &node);
 
 /**

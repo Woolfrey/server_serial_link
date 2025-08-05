@@ -2,8 +2,8 @@
  * @file    follow_transform_server.cpp
  * @author  Jon Woolfrey
  * @email   jonathan.woolfrey@gmail.com
- * @date    February 2025
- * @version 1.0
+ * @date    July 2025
+ * @version 1.1
  * @brief   Demonstrates real-time Cartesian velocity control of a robot arm by making it follow a
  *          desired transform.
  * 
@@ -20,8 +20,10 @@
  * @see https://docs.ros.org/en/humble/index.html for ROS 2 documentation.
  */
 
+#include <RobotLibrary/Control/SerialDynamicControl.h>
 #include <RobotLibrary/Control/SerialKinematicControl.h>                                            // For serial link robots
 #include <serial_link_action_server/follow_transform.hpp>                                           // Real-time velocity control of endpoint
+#include <serial_link_action_server/hold_configuration.hpp>
 #include <serial_link_action_server/model_updater.hpp>                                              // Joint state subscriber
 #include <serial_link_action_server/track_joint_trajectory.hpp>                                     // Joint trajectory tracking
 #include <serial_link_action_server/utilities.hpp>                                                  // Helper functions
@@ -35,11 +37,11 @@ int main(int argc, char **argv)
     
     rclcpp::init(argc, argv);                                                                       // Launches ROS2
 
-    // Ensure sufficient number of arguments is provided
-    if (argc < 5)
+    // Ensure sufficient number of arguments are provided
+    if (argc < 6)
     {
         RCLCPP_ERROR(rclcpp::get_logger("main"), "Invalid number of arguments. "
-                     "Usage: <executable> <urdf_path> <endpoint_name> <control_topic_name> <joint_state_topic_name>");
+                     "Usage: <executable> <urdf_path> <endpoint_name> <control_topic_name> <joint_state_topic_name> <control_mode>");
 
         rclcpp::shutdown();
         
@@ -51,6 +53,7 @@ int main(int argc, char **argv)
     std::string endpointName    = argv[2];
     std::string controlTopic    = argv[3];
     std::string jointStateTopic = argv[4];
+    std::string controlMode     = argv[5];
         
     try 
     {
@@ -60,11 +63,29 @@ int main(int argc, char **argv)
         
         auto serverNode = std::make_shared<rclcpp::Node>(model->name()+"_action_server");           // Create action server nodes
         
-        auto controller = std::make_shared<RobotLibrary::Control::SerialKinematicControl>(model, endpointName, load_control_parameters(serverNode));
+        std::shared_ptr<RobotLibrary::Control::SerialLinkBase> controller;                          // This allows for polymorphism
+        
+             if (controlMode == "VELOCITY") controller = std::make_unique<RobotLibrary::Control::SerialKinematicControl>(model, endpointName, load_control_parameters(serverNode));
+        else if (controlMode == "TORQUE")   controller = std::make_unique<RobotLibrary::Control::SerialDynamicControl>(model, endpointName, load_control_parameters(serverNode));
+        else
+        {
+            std::cerr << "[ERROR] [FOLLOW TRANSFORM SERVER] "
+                      << "Invalid argument for control mode. Options are VELOCITY or TORQUE, "
+                      << "but received " << controlMode << ".\n";
+                               
+            return -1;
+        }
           
         // Declare action servers
         auto mutex = std::make_shared<std::mutex>();                                                // This stops 2 actions using the robot at the same time
 
+        HoldConfiguration holdConfigurationServer(
+            serverNode,
+            controller,
+            mutex,
+            "hold_configuration",
+            controlTopic);
+        
         TrackJointTrajectory jointTrajectoryServer(
             serverNode,
             controller,
@@ -80,7 +101,7 @@ int main(int argc, char **argv)
             controlTopic);
                  
         // Add nodes to executor and spin
-        rclcpp::executors::MultiThreadedExecutor executor;
+        rclcpp::executors::SingleThreadedExecutor executor;
         executor.add_node(modelUpdaterNode);
         executor.add_node(serverNode);
         
