@@ -265,14 +265,16 @@ FollowTwist::execute(const std::shared_ptr<GoalHandle> goalHandle)
             if (_feedback->linear_error > goal->linear_tolerance)
             {
                 cleanup_and_send_result(3, "Linear velocity error tolerance violated: "
-                                        + std::to_string(_feedback->linear_error) + " >= " + std::to_string(goal->linear_tolerance) + ".",
+                                        + std::to_string(_feedback->linear_error) + " >= "
+                                        + std::to_string(goal->linear_tolerance),
                                         goalHandle);
                 return;
             }
             else if (_feedback->angular_error > goal->angular_tolerance)
             {
                 cleanup_and_send_result(3, "Angular velocity error tolerance violated: "
-                                        + std::to_string(_feedback->angular_error) + " >= " + std::to_string(goal->angular_tolerance) + ".",
+                                        + std::to_string(_feedback->angular_error) + " >= "
+                                        + std::to_string(goal->angular_tolerance),
                                         goalHandle);
                 return;
             }
