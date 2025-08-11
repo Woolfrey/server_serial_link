@@ -21,8 +21,8 @@ This package contains [ROS2 action servers](https://design.ros2.org/articles/act
 
 - [Ubuntu 22.04](https://ubuntu.com/blog/tag/22-04-lts), or later,
 - [ROS2 Humble](https://docs.ros.org/en/humble/index.html), or later,
-- [RobotLibrary](https://github.com/Woolfrey/software_robot_library), and
-- The [serial link interfaces](https://github.com/Woolfrey/interface_serial_link) package.
+- [RobotLibrary v2.0.0](https://github.com/Woolfrey/software_robot_library/releases/tag/v2.0.0)), and
+- The [serial link interfaces v1.0.0](https://github.com/Woolfrey/interface_serial_link/releases/tag/v1.1.0) package.
 
 > [!NOTE]
 > This package was built and tested using Ubuntu 22.04, and ROS2 Humble.
