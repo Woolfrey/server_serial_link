@@ -5,6 +5,6 @@ authors:
   given-names: "Jon"
   orcid: "https://orcid.org/0000-0001-5926-5669"
 title: "Serial Link Action Server"
-version: 1.0.0
-date-released: 2025-04-11
+version: 2.0.0
+date-released: 2025-08-11
 url: "https://github.com/Woolfrey/server_serial_link"
