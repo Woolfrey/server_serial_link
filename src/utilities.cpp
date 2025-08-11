@@ -2,8 +2,9 @@
  * @file    utilities.cpp
  * @author  Jon Woolfrey
  * @email   jonathan.woolfrey@gmail.com
- * @date    July 2025
- * @version 1.1
+ * @date    August 2025
+ * @version 2.0
+ *
  * @brief   Useful functions for use in action servers.
  * 
  * @details This source file elaborates on the functions in include/Utilities.h
@@ -53,25 +54,20 @@ load_control_parameters(const std::shared_ptr<rclcpp::Node> &node)
 {
     RobotLibrary::Control::SerialLinkParameters parameters;
 
-    parameters.cartesianVelocityGain = vector_to_matrix(
-        node->declare_parameter<std::vector<double>>("cartesian_velocity_gain", std::vector<double>{}));
+    // RobotLibrary specific:
+    parameters.cartesianVelocityGain = vector_to_matrix(node->declare_parameter<std::vector<double>>("cartesian_velocity_gain", std::vector<double>{}));
+    parameters.cartesianPoseGain     = vector_to_matrix(node->declare_parameter<std::vector<double>>("cartesian_pose_gain", std::vector<double>{}));
+    parameters.controlFrequency      = node->declare_parameter<double>("frequency", parameters.controlFrequency);
+    parameters.jointPositionGains    = node->declare_parameter<std::vector<double>>("joint_position_gains", std::vector<double>{});
+    parameters.jointVelocityGains    = node->declare_parameter<std::vector<double>>("joint_velocity_gains", std::vector<double>{});
+    parameters.minManipulability     = node->declare_parameter<double>("manipulability_threshold", parameters.minManipulability);
+    parameters.maxJointAcceleration  = node->declare_parameter<double>("max_joint_acceleration", parameters.maxJointAcceleration);
 
-    parameters.cartesianPoseGain = vector_to_matrix(
-        node->declare_parameter<std::vector<double>>("cartesian_pose_gain", std::vector<double>{}));
-
-    parameters.controlFrequency     = node->declare_parameter<double>("frequency", parameters.controlFrequency);
-    parameters.jointPositionGain    = node->declare_parameter<double>("joint_position_gain", parameters.jointPositionGain);
-    parameters.jointVelocityGain    = node->declare_parameter<double>("joint_velocity_gain", parameters.jointVelocityGain);
-    parameters.minManipulability    = node->declare_parameter<double>("manipulability_threshold", parameters.minManipulability);
-    parameters.maxJointAcceleration = node->declare_parameter<double>("max_joint_acceleration", parameters.maxJointAcceleration);
-
+    // For the QP solver:
     parameters.qpsolver.barrierReductionRate = node->declare_parameter<double>("barrier_reduction_rate", parameters.qpsolver.barrierReductionRate);
     parameters.qpsolver.initialBarrierScalar = node->declare_parameter<double>("initial_barrier_scalar", parameters.qpsolver.initialBarrierScalar);
-
-    parameters.qpsolver.maxSteps = static_cast<unsigned int>(
-        node->declare_parameter<int>("max_steps", static_cast<int>(parameters.qpsolver.maxSteps)));
-
-    parameters.qpsolver.stepSizeTolerance = node->declare_parameter<double>("step_size_tolerance", parameters.qpsolver.stepSizeTolerance);
+    parameters.qpsolver.maxSteps             = static_cast<unsigned int>(node->declare_parameter<int>("max_steps", static_cast<int>(parameters.qpsolver.maxSteps)));
+    parameters.qpsolver.stepSizeTolerance    = node->declare_parameter<double>("step_size_tolerance", parameters.qpsolver.stepSizeTolerance);
 
     return parameters;
 }
@@ -96,37 +92,6 @@ update_statistics(serial_link_interfaces::msg::Statistics &statistics,
         
         statistics.variance = ((n-2) * statistics.variance + (n / (n - 1)) * delta * delta ) / (n - 1);
     }
-}
-
-  ////////////////////////////////////////////////////////////////////////////////////////////////////
- //              Put an Eigen::Vector<double,6> in to a geometry_msgs::msg::Twist                  //
-////////////////////////////////////////////////////////////////////////////////////////////////////
-void
-Eigen_twist_to_ROS(geometry_msgs::msg::Twist &feedbackTwist,
-                   const Eigen::Vector<double, 6> &twist)
-{
-    feedbackTwist.linear.x  = twist[0];
-    feedbackTwist.linear.y  = twist[1];
-    feedbackTwist.linear.z  = twist[2];
-    feedbackTwist.angular.x = twist[3];
-    feedbackTwist.angular.y = twist[4];
-    feedbackTwist.angular.z = twist[5];
-}
-
-  ////////////////////////////////////////////////////////////////////////////////////////////////////
- //                Puts a RobotLibrary::Model::Pose object into a ROS2 geometry_msgs/Pose                 //
-////////////////////////////////////////////////////////////////////////////////////////////////////
-void
-RL_pose_to_ROS(geometry_msgs::msg::Pose &feedbackPose,
-               const RobotLibrary::Model::Pose &pose)
-{
-    feedbackPose.position.x    = pose.translation()[0];
-    feedbackPose.position.y    = pose.translation()[1];
-    feedbackPose.position.z    = pose.translation()[2];
-    feedbackPose.orientation.w = pose.quaternion().w();
-    feedbackPose.orientation.x = pose.quaternion().x();
-    feedbackPose.orientation.y = pose.quaternion().y();
-    feedbackPose.orientation.z = pose.quaternion().z();
 }
 
 } // namespace
