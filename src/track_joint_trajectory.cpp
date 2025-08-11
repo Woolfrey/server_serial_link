@@ -164,7 +164,7 @@ TrackJointTrajectory::execute(const std::shared_ptr<GoalHandle> goalHandle)
         // NOTE: Controller may throw a runtime error, so need to catch it here.
         try
         {
-            // Solve control and send immediately to robot
+            // Solve control and send immediately to robot               
             publish_joint_command(_controller->track_joint_trajectory(desiredPosition,
                                                                       desiredVelocity,
                                                                       desiredAcceleration));
@@ -190,7 +190,10 @@ TrackJointTrajectory::execute(const std::shared_ptr<GoalHandle> goalHandle)
                 
                 if(abs(positionError) > goal->tolerances[j])
                 {
-                    cleanup_and_send_result(3, "Tolerance for joint " + std::to_string(j) + " violated.", goalHandle); // Abort
+                    cleanup_and_send_result(3, "Tolerance for joint " + std::to_string(j+1) + " violated: "
+                                               + std::to_string(abs(positionError)) + " > "
+                                               + std::to_string(goal->tolerances[j]),
+                                               goalHandle); // Abort
                     return;
                 }
             }
