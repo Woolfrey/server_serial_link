@@ -2,8 +2,9 @@
  * @file    follow_transform_server.cpp
  * @author  Jon Woolfrey
  * @email   jonathan.woolfrey@gmail.com
- * @date    July 2025
- * @version 1.1
+ * @date    August 2025
+ * @version 1.2
+ *
  * @brief   Demonstrates real-time Cartesian velocity control of a robot arm by making it follow a
  *          desired transform.
  * 
@@ -20,8 +21,10 @@
  * @see https://docs.ros.org/en/humble/index.html for ROS 2 documentation.
  */
 
-#include <RobotLibrary/Control/SerialDynamicControl.h>
-#include <RobotLibrary/Control/SerialKinematicControl.h>                                            // For serial link robots
+#include <RobotLibrary/Control/SerialLinkDynamics.h>
+#include <RobotLibrary/Control/SerialLinkImpedance.h>
+#include <RobotLibrary/Control/SerialLinkKinematics.h>
+
 #include <serial_link_action_server/follow_transform.hpp>                                           // Real-time velocity control of endpoint
 #include <serial_link_action_server/hold_configuration.hpp>
 #include <serial_link_action_server/model_updater.hpp>                                              // Joint state subscriber
@@ -65,12 +68,13 @@ int main(int argc, char **argv)
         
         std::shared_ptr<RobotLibrary::Control::SerialLinkBase> controller;                          // This allows for polymorphism
         
-             if (controlMode == "VELOCITY") controller = std::make_unique<RobotLibrary::Control::SerialKinematicControl>(model, endpointName, load_control_parameters(serverNode));
-        else if (controlMode == "TORQUE")   controller = std::make_unique<RobotLibrary::Control::SerialDynamicControl>(model, endpointName, load_control_parameters(serverNode));
+             if (controlMode == "VELOCITY")  controller = std::make_unique<RobotLibrary::Control::SerialLinkKinematics>(model, endpointName, load_control_parameters(serverNode));
+        else if (controlMode == "TORQUE")    controller = std::make_unique<RobotLibrary::Control::SerialLinkDynamics>(model, endpointName, load_control_parameters(serverNode));
+        else if (controlMode == "IMPEDANCE") controller = std::make_unique<RobotLibrary::Control::SerialLinkImpedance>(model, endpointName, load_control_parameters(serverNode));
         else
         {
             std::cerr << "[ERROR] [FOLLOW TRANSFORM SERVER] "
-                      << "Invalid argument for control mode. Options are VELOCITY or TORQUE, "
+                      << "Invalid argument for control mode. Options are VELOCITY, TORQUE, or IMPEDANCE "
                       << "but received " << controlMode << ".\n";
                                
             return -1;
