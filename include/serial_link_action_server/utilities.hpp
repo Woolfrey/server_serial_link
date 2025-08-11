@@ -2,8 +2,8 @@
  * @file    utilities.hpp
  * @author  Jon Woolfrey
  * @email   jonathan.woolfrey@gmail.com
- * @date    February 2025
- * @version 1.0
+ * @date    August 2025
+ * @version 1.2
  * @brief   Useful functions for use in action servers.
  * 
  * @details This header file contains forward declarations of functions that are useful in action servers.
@@ -55,24 +55,6 @@ void
 update_statistics(serial_link_interfaces::msg::Statistics &statistics,
                   const double &newValue,
                   const unsigned int &n);
-
-/**
- * @brief Puts an Eigen::Vector<double,6> object in to a ROS2 geometry_msgs/Twist
- * @param feedbackTwist The ROS2 object to put the data in to.
- * @param twist The Eigen::Vector object with the data we need.
- */
-void
-Eigen_twist_to_ROS(geometry_msgs::msg::Twist &feedbackTwist,
-                   const Eigen::Vector<double, 6> &twist);
-                   
-/**
- * @brief Puts a RobotLibrary::Pose object in to a ROS2 geometry_msgs/Pose
- * @param feedbackPose The ROS msg
- * @param pose The RobotLibrary object.
- */
-void
-RL_pose_to_ROS(geometry_msgs::msg::Pose &feedbackPose,
-               const RobotLibrary::Model::Pose &pose);
 }
 
 #endif
