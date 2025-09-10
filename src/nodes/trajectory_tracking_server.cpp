@@ -19,9 +19,8 @@
  * @see https://docs.ros.org/en/humble/index.html for ROS 2 documentation.
  */
 
-#include <RobotLibrary/Control/SerialLinkDynamics.h>
 #include <RobotLibrary/Control/SerialLinkImpedance.h>
-#include <RobotLibrary/Control/SerialLinkKinematics.h>
+#include <RobotLibrary/Control/SerialLinkKinematic.h>
 
 #include <serial_link_action_server/model_updater.hpp>                                              // Joint state subscriber
 #include <serial_link_action_server/hold_configuration.hpp>
@@ -67,13 +66,12 @@ int main(int argc, char **argv)
 
         std::shared_ptr<RobotLibrary::Control::SerialLinkBase> controller;                          // This allows for polymorphism
         
-             if (controlMode == "VELOCITY")  controller = std::make_unique<RobotLibrary::Control::SerialLinkKinematics>(model, endpointName, load_control_parameters(serverNode));
-        else if (controlMode == "TORQUE")    controller = std::make_unique<RobotLibrary::Control::SerialLinkDynamics>(model, endpointName, load_control_parameters(serverNode));
+             if (controlMode == "VELOCITY")  controller = std::make_unique<RobotLibrary::Control::SerialLinkKinematic>(model, endpointName, load_control_parameters(serverNode));
         else if (controlMode == "IMPEDANCE") controller = std::make_unique<RobotLibrary::Control::SerialLinkImpedance>(model, endpointName, load_control_parameters(serverNode));
         else
         {
             std::cerr << "[ERROR] [FOLLOW TRANSFORM SERVER] "
-                      << "Invalid argument for control mode. Options are VELOCITY, TORQUE, or IMPEDANCE "
+                      << "Invalid argument for control mode. Options are VELOCITY, or IMPEDANCE "
                       << "but received " << controlMode << ".\n";
                                
             return -1;
